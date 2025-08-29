@@ -1,103 +1,200 @@
-import Image from "next/image";
+'use client';
+
+import { useCallback, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+
+const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!;
+const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!;
+const folder = process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || '';
+
+// Helper to upload a single file with progress
+async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) => void) {
+  // Step 1: ask our API route for a signature
+  const signRes = await fetch("/api/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folder: "social-ai-poc" }), // optional
+  });
+  const { cloudName, apiKey, folder, timestamp, signature } = await signRes.json();
+
+  // Step 2: build the form data Cloudinary expects
+  const form = new FormData();
+  form.append("file", file);
+  form.append("api_key", apiKey);
+  form.append("timestamp", String(timestamp));
+  form.append("folder", folder);
+  form.append("signature", signature);
+
+  // Step 3: upload to Cloudinary
+  return new Promise<{ url: string; public_id: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`);
+    xhr.upload.onprogress = (evt) => {
+      if (evt.lengthComputable && onProgress) {
+        const pct = Math.round((evt.loaded / evt.total) * 100);
+        onProgress(pct);
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const json = JSON.parse(xhr.responseText);
+        resolve({ url: json.secure_url, public_id: json.public_id });
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.send(form);
+  });
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [gallery, setGallery] = useState<{ url: string; id: string }[]>([]);
+  const [dragActive, setDragActive] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const onFiles = useCallback((incoming: FileList | null) => {
+    if (!incoming) return;
+    const arr = Array.from(incoming).filter((f) => f.type.startsWith('image/'));
+    setFiles((prev) => [...prev, ...arr]);
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    onFiles(e.dataTransfer.files);
+  }, [onFiles]);
+
+  const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  }, []);
+
+  const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  }, []);
+
+  const startUpload = useCallback(async () => {
+    for (const file of files) {
+      setProgress((p) => ({ ...p, [file.name]: 0 }));
+      try {
+        const res = await uploadToCloudinarySigned(file, (pct) =>
+          setProgress((p) => ({ ...p, [file.name]: pct }))
+        );
+        setGallery((g) => [{ url: res.url, id: res.public_id }, ...g]);
+      } catch (err) {
+        console.error('Upload error', err);
+        setProgress((p) => ({ ...p, [file.name]: -1 }));
+      }
+    }
+    setFiles([]);
+  }, [files]);
+
+  const borderClass = dragActive ? 'border-indigo-500' : 'border-dashed border-gray-400';
+
+  return (
+    <main className="min-h-dvh p-6 md:p-10">
+      <div className="mx-auto max-w-5xl space-y-8">
+        <header className="space-y-2">
+          <h1 className="text-3xl font-bold">Day 1 — Upload images to Cloudinary</h1>
+          <p className="text-sm text-gray-600">
+            Drag & drop or select multiple files. Then hit Upload. Watch per-file progress and see them
+            appear in the gallery below.
+          </p>
+        </header>
+
+        <section>
+          <div
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            className={`rounded-2xl border-2 ${borderClass} bg-white/70 backdrop-blur p-6 flex flex-col items-center justify-center gap-4 text-center`}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            <div className="text-lg font-medium">Drag & drop images here</div>
+            <div className="text-xs text-gray-500">PNG, JPG, GIF, WebP (max ~10MB typical free plan)</div>
+            <button
+              className="px-4 py-2 rounded-xl shadow bg-black text-white hover:opacity-90"
+              onClick={() => inputRef.current?.click()}
+            >
+              Choose files
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => onFiles(e.target.files)}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          </div>
+
+          {files.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <div className="text-sm text-gray-700">Ready to upload ({files.length}):</div>
+              <ul className="grid gap-3 md:grid-cols-2">
+                {files.map((f) => (
+                  <li key={f.name} className="rounded-xl border p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium truncate max-w-[60%]" title={f.name}>{f.name}</div>
+                      <div className="text-xs text-gray-500">{Math.round(f.size / 1024)} KB</div>
+                    </div>
+                    <div className="mt-2 h-2 w-full rounded bg-gray-200 overflow-hidden">
+                      <div
+                        className={`h-full ${progress[f.name] === -1 ? 'bg-red-500' : 'bg-black'}`}
+                        style={{ width: `${Math.max(0, progress[f.name] ?? 0)}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-3">
+                <button
+                  onClick={startUpload}
+                  className="px-4 py-2 rounded-xl shadow bg-black text-white hover:opacity-90 disabled:opacity-50"
+                  disabled={files.length === 0}
+                >
+                  Upload {files.length > 1 ? 'files' : 'file'}
+                </button>
+                <button
+                  onClick={() => setFiles([])}
+                  className="px-4 py-2 rounded-xl border"
+                >
+                  Clear list
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Gallery</h2>
+          {gallery.length === 0 ? (
+            <p className="text-sm text-gray-600">No images yet — upload some!</p>
+          ) : (
+            <ul className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {gallery.map((img) => (
+                <li key={img.id} className="rounded-xl overflow-hidden border bg-white">
+                  <a href={img.url} target="_blank" rel="noreferrer">
+                    <Image
+                      src={img.url}
+                      alt={img.id}
+                      width={500}
+                      height={500}
+                      className="aspect-square object-cover"
+                    />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
