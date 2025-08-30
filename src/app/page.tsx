@@ -1,11 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Image from 'next/image';
-
-const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!;
-const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!;
-const folder = process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || '';
 
 // Helper to upload a single file with progress
 async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) => void) {
@@ -13,9 +9,17 @@ async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) =
   const signRes = await fetch("/api/sign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ folder: "social-ai-poc" }), // optional
+    // If your API supports dynamic folder, you can keep this body; otherwise remove it.
+    body: JSON.stringify({ folder: "social-ai-poc" }),
   });
-  const { cloudName, apiKey, folder, timestamp, signature } = await signRes.json();
+
+  if (!signRes.ok) {
+    const text = await signRes.text();
+    throw new Error(`Signer error ${signRes.status}: ${text}`);
+  }
+
+  // NOTE: we now read uploadPreset from the server response
+  const { cloudName, apiKey, folder, uploadPreset, timestamp, signature } = await signRes.json();
 
   // Step 2: build the form data Cloudinary expects
   const form = new FormData();
@@ -24,6 +28,7 @@ async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) =
   form.append("timestamp", String(timestamp));
   form.append("folder", folder);
   form.append("signature", signature);
+  form.append("upload_preset", uploadPreset); // ★ REQUIRED: must match what the server signed
 
   // Step 3: upload to Cloudinary
   return new Promise<{ url: string; public_id: string }>((resolve, reject) => {
@@ -36,11 +41,16 @@ async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) =
       }
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const json = JSON.parse(xhr.responseText);
-        resolve({ url: json.secure_url, public_id: json.public_id });
-      } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
+      try {
+        const json = JSON.parse(xhr.responseText || "{}");
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ url: json.secure_url, public_id: json.public_id });
+        } else {
+          const msg = json?.error?.message || `Upload failed: ${xhr.status}`;
+          reject(new Error(msg));
+        }
+      } catch (e) {
+        reject(new Error(`Upload parse error: ${String(e)}`));
       }
     };
     xhr.onerror = () => reject(new Error("Network error"));
