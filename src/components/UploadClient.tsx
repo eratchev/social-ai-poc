@@ -90,12 +90,20 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
         }
       };
       xhr.onload = () => {
+        const raw = xhr.responseText || '';
         try {
-          const json = JSON.parse(xhr.responseText || '{}') as CloudinaryUploadResult;
-          if (xhr.status >= 200 && xhr.status < 300) resolve(json);
-          else reject(new Error(`Upload failed: ${xhr.status}`));
-        } catch (e) {
-          reject(new Error(`Upload parse error: ${String(e)}`));
+          const json = raw ? JSON.parse(raw) : {};
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(json as CloudinaryUploadResult);
+          } else {
+            const msg =
+              (json as any)?.error?.message ||
+              (json as any)?.message ||
+              `Upload failed: ${xhr.status}`;
+            reject(new Error(msg));
+          }
+        } catch {
+          reject(new Error(`Upload failed ${xhr.status}: ${raw.slice(0, 200)}`));
         }
       };
       xhr.onerror = () => reject(new Error('Network error'));

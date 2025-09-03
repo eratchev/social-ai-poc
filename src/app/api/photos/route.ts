@@ -42,14 +42,30 @@ export async function POST(req: Request) {
       takenAt,
     } = json;
 
-    const [user, room] = await Promise.all([
-      prisma.user.findUnique({ where: { handle: ownerHandle } }),
-      prisma.room.findUnique({ where: { code: roomCode } }),
-    ]);
-    if (!user || !room) {
-      return NextResponse.json({ error: 'Seed user/room not found' }, { status: 400 });
+    // 1) User upsert
+    const user = await prisma.user.upsert({
+      where: { handle: ownerHandle },
+      update: {},
+      create: { handle: ownerHandle, displayName: ownerHandle },
+      select: { id: true },
+    });
+
+    // 2) Room find-or-create (Room requires creator)
+    let room = await prisma.room.findUnique({
+      where: { code: roomCode },
+      select: { id: true },
+    });
+    if (!room) {
+      room = await prisma.room.create({
+        data: {
+          code: roomCode,
+          createdBy: user.id, // FK to User
+        },
+        select: { id: true },
+      });
     }
 
+    // 3) Create Photo
     const photo = await prisma.photo.create({
       data: {
         ownerId: user.id,
@@ -74,19 +90,11 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    const [user, room] = await Promise.all([
-      prisma.user.findUnique({ where: { handle: 'devuser' } }),
-      prisma.room.findUnique({ where: { code: 'DEVROOM' } }),
-    ]);
-    if (!user || !room) return NextResponse.json({ photos: [] });
-
     const photos = await prisma.photo.findMany({
-      where: { ownerId: user.id, roomId: room.id },
       orderBy: { createdAt: 'desc' },
       select: { id: true, storageUrl: true, publicId: true, createdAt: true },
       take: 60,
     });
-
     return NextResponse.json({ photos });
   } catch (err) {
     console.error('GET /api/photos error', err);
