@@ -124,6 +124,16 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
       }),
     });
 
+    console.log('POST /api/photos payload', {
+      publicId: result.public_id,
+      secureUrl: result.secure_url,
+      width: result.width,
+      height: result.height,
+      bytes: result.bytes,
+      format: result.format,
+      folder,
+    });
+
     return { url: result.secure_url, public_id: result.public_id, meta: result };
   }
 
