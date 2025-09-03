@@ -3,8 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StoryStatus {
+  PENDING
+  PROCESSING
+  READY
+  ERROR
 }
 
 model User {
@@ -13,47 +20,47 @@ model User {
   displayName String
   createdAt   DateTime @default(now())
 
-  rooms       Room[]
-  photos      Photo[]
-  stories     Story[]  @relation("StoryOwner")
+  rooms   Room[]
+  photos  Photo[]
+  stories Story[] @relation("StoryOwner")
 
   @@index([createdAt])
 }
 
 model Room {
-  id         String   @id @default(cuid())
-  code       String   @unique
-  createdBy  String
-  creator    User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  code      String   @unique
+  createdBy String
+  creator   User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-  photos     Photo[]
-  stories    Story[]
+  photos  Photo[]
+  stories Story[]
 
   @@index([createdBy])
   @@index([createdAt])
 }
 
 model Photo {
-  id          String   @id @default(cuid())
-  roomId      String
-  ownerId     String
-  storageUrl  String              // Cloudinary secure_url
+  id         String @id @default(cuid())
+  roomId     String
+  ownerId    String
+  storageUrl String // Cloudinary secure_url
 
   // Cloudinary metadata (optional, but useful)
-  publicId    String?             // e.g. "social-ai-poc/abc123"
-  width       Int?
-  height      Int?
-  bytes       Int?
-  format      String?
-  folder      String?
+  publicId String? // e.g. "social-ai-poc/abc123"
+  width    Int?
+  height   Int?
+  bytes    Int?
+  format   String?
+  folder   String?
 
-  takenAt     DateTime?
-  exifJson    Json?
-  createdAt   DateTime @default(now())
+  takenAt   DateTime?
+  exifJson  Json?
+  createdAt DateTime  @default(now())
 
-  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  room  Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([roomId])
   @@index([ownerId])
@@ -62,20 +69,30 @@ model Photo {
 }
 
 model Story {
-  id          String   @id @default(cuid())
-  roomId      String
-  ownerId     String
-  title       String
-  beatsJson   Json      // Beat[]
-  panelMap    Json      // Panel[] { index, photoId, narration, bubbles[] }
-  renderedUrl String?   // png/pdf
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id      String @id @default(cuid())
+  roomId  String
+  ownerId String
 
-  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  owner       User     @relation("StoryOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  narrative   String // full story text (markdown or plain)
+  beatsJson   Json    @default("[]") // Beat[]
+  panelMap    Json    @default("[]") // Panel[] { index, photoId, narration, bubbles[] }
+  renderedUrl String? // png/pdf
+
+  status    StoryStatus @default(PENDING)
+  error     String?
+  model     String?
+  prompt    String?
+  shareSlug String?     @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room  Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  owner User @relation("StoryOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([roomId])
   @@index([ownerId])
+  @@index([status, createdAt])
   @@index([createdAt])
 }
