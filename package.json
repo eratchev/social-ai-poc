@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "vercel-build": "PRISMA_SCHEMA_DISABLE_DOTENV=1 node -e \"const u=new URL(process.env.DATABASE_URL); console.log('DB for migrate deploy:', u.hostname+':'+u.port)\" && PRISMA_SCHEMA_DISABLE_DOTENV=1 prisma migrate deploy && next build",
+    "vercel-build": "prisma migrate deploy && next build",
     "postinstall": "prisma generate",    
     "prisma:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
   },
