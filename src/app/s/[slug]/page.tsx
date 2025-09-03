@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Image from 'next/image';
 import { blurDataURL } from '@/lib/blur';
+import RegenerateButton from '@/components/RegenerateButton';
+import ShareLinkButton from '@/components/ShareLinkButton';
 
 export const runtime = 'nodejs';
 
@@ -52,11 +54,18 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
     <main className="mx-auto max-w-5xl px-4 py-8">
       {/* Header */}
       <header className="mb-8">
+        <div>
+
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{story.title}</h1>
         <p className="mt-1 text-sm text-gray-500">
           Room <span className="font-mono">{story.room.code}</span> · Published{' '}
           {story.createdAt.toLocaleDateString()}
         </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <ShareLinkButton />
+          <RegenerateButton roomCode={story.room.code} />
+        </div>
       </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
