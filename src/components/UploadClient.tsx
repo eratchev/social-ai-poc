@@ -2,9 +2,27 @@
 
 import Image from 'next/image';
 import { useCallback, useRef, useState } from 'react';
-const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
 type GalleryItem = { id: string; url: string };
+
+type SignResponse = {
+  cloudName: string;
+  apiKey: string;
+  folder: string;
+  uploadPreset: string;
+  timestamp: number;
+  signature: string;
+};
+
+type CloudinaryUploadResult = {
+  public_id: string;
+  secure_url: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+  format?: string;
+};
+
 export default function UploadClient({ initialGallery }: { initialGallery: GalleryItem[] }) {
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
@@ -12,20 +30,15 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  const MAX_BYTES = 10 * 1024 * 1024;
 
   const onFiles = useCallback((incoming: FileList | null) => {
     if (!incoming) return;
     const arr = Array.from(incoming);
     const accepted: File[] = [];
     for (const f of arr) {
-      if (!f.type.startsWith('image/')) {
-        console.warn(`Skipping non-image: ${f.name}`);
-        continue;
-      }
-      if (f.size > MAX_BYTES) {
-        console.warn(`Skipping too-large file (>10MB): ${f.name}`);
-        continue;
-      }
+      if (!f.type.startsWith('image/')) continue;
+      if (f.size > MAX_BYTES) continue;
       accepted.push(f);
     }
     setFiles((prev) => [...prev, ...accepted]);
@@ -44,14 +57,18 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
     e.preventDefault(); e.stopPropagation(); setDragActive(false);
   }, []);
 
-  async function uploadToCloudinarySigned(file: File, onProgress?: (pct: number) => void) {
+  async function uploadToCloudinarySigned(
+    file: File,
+    onProgress?: (pct: number) => void
+  ): Promise<{ url: string; public_id: string; meta: CloudinaryUploadResult }> {
     const signRes = await fetch('/api/sign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ folder: 'social-ai-poc' }),
     });
     if (!signRes.ok) throw new Error(`Signer error ${signRes.status}`);
-    const { cloudName, apiKey, folder, uploadPreset, timestamp, signature } = await signRes.json();
+    const { cloudName, apiKey, folder, uploadPreset, timestamp, signature } =
+      (await signRes.json()) as SignResponse;
 
     const form = new FormData();
     form.append('file', file);
@@ -63,7 +80,7 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
 
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
 
-    const result: any = await new Promise((resolve, reject) => {
+    const result: CloudinaryUploadResult = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', uploadUrl);
       xhr.upload.onprogress = (evt) => {
@@ -74,9 +91,9 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
       };
       xhr.onload = () => {
         try {
-          const json = JSON.parse(xhr.responseText || '{}');
+          const json = JSON.parse(xhr.responseText || '{}') as CloudinaryUploadResult;
           if (xhr.status >= 200 && xhr.status < 300) resolve(json);
-          else reject(new Error(json?.error?.message || `Upload failed: ${xhr.status}`));
+          else reject(new Error(`Upload failed: ${xhr.status}`));
         } catch (e) {
           reject(new Error(`Upload parse error: ${String(e)}`));
         }
@@ -99,7 +116,7 @@ export default function UploadClient({ initialGallery }: { initialGallery: Galle
       }),
     });
 
-    return { url: result.secure_url, public_id: result.public_id };
+    return { url: result.secure_url, public_id: result.public_id, meta: result };
   }
 
   const startUpload = useCallback(async () => {
