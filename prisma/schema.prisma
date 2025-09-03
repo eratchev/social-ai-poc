@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  handle      String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+
+  rooms       Room[]
+  photos      Photo[]
+  stories     Story[]  @relation("StoryOwner")
+
+  @@index([createdAt])
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  createdBy  String
+  creator    User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  photos     Photo[]
+  stories    Story[]
+
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  roomId      String
+  ownerId     String
+  storageUrl  String              // Cloudinary secure_url
+
+  // Cloudinary metadata (optional, but useful)
+  publicId    String?             // e.g. "social-ai-poc/abc123"
+  width       Int?
+  height      Int?
+  bytes       Int?
+  format      String?
+  folder      String?
+
+  takenAt     DateTime?
+  exifJson    Json?
+  createdAt   DateTime @default(now())
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([ownerId])
+  @@index([publicId])
+  @@index([createdAt])
+}
+
+model Story {
+  id          String   @id @default(cuid())
+  roomId      String
+  ownerId     String
+  title       String
+  beatsJson   Json      // Beat[]
+  panelMap    Json      // Panel[] { index, photoId, narration, bubbles[] }
+  renderedUrl String?   // png/pdf
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  owner       User     @relation("StoryOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([ownerId])
+  @@index([createdAt])
+}
