@@ -1,38 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
+// src/app/api/story/[id]/route.ts
 import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: Request) {
   try {
+    // Parse the story id from the URL (/api/story/<id>)
+    const pathname = new URL(req.url).pathname;
+    const id = pathname.split('/').pop();
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'bad_request' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     const story = await prisma.story.findUnique({
-      where: { id: params.id },
-      include: {
-        room: { select: { code: true } },
-      },
+      where: { id },
+      include: { room: { select: { code: true } } },
     });
 
     if (!story) {
-      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+      return new Response(JSON.stringify({ error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      });
     }
 
-    return NextResponse.json({
-      id: story.id,
-      roomCode: story.room.code,
-      title: story.title,
-      narrative: story.narrative,
-      status: story.status,
-      beats: story.beatsJson,   // JSON array
-      panels: story.panelMap,   // JSON array
-      shareSlug: story.shareSlug,
-      createdAt: story.createdAt,
-      updatedAt: story.updatedAt,
-    });
+    return new Response(
+      JSON.stringify({
+        id: story.id,
+        roomCode: story.room.code,
+        title: story.title,
+        narrative: story.narrative,
+        status: story.status,
+        beats: story.beatsJson,
+        panels: story.panelMap,
+        shareSlug: story.shareSlug,
+        createdAt: story.createdAt,
+        updatedAt: story.updatedAt,
+      }),
+      { headers: { 'content-type': 'application/json' } }
+    );
   } catch (err) {
     console.error('GET /api/story/[id] error', err);
-    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
   }
 }

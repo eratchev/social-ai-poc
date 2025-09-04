@@ -11,28 +11,33 @@ export const runtime = 'nodejs';
 type Beat = { photoId?: string; caption: string };
 type Panel = { index: number; photoId?: string; narration: string; bubbles: string[] };
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+// NOTE: In Next 15, params may be a Promise. Await it.
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const story = await prisma.story.findFirst({
-    where: { shareSlug: params.slug, status: 'READY' },
+    where: { shareSlug: slug, status: 'READY' },
     select: { title: true },
   });
   if (!story) return { title: 'Story not found' };
   return { title: story.title };
 }
 
-export default async function SharedStoryPage({ params }: { params: { slug: string } }) {
+// Same here: await params
+export default async function SharedStoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+
   const story = await prisma.story.findFirst({
-    where: { shareSlug: params.slug, status: 'READY' },
+    where: { shareSlug: slug, status: 'READY' },
     include: { room: { select: { code: true } } },
   });
 
   if (!story) notFound();
 
-  // Parse JSON blobs (they have defaults, but be defensive)
+  // Parse JSON blobs (defensive)
   const beats = (Array.isArray(story.beatsJson) ? story.beatsJson : []) as Beat[];
   const panels = (Array.isArray(story.panelMap) ? story.panelMap : []) as Panel[];
 
-  // Collect photoIds referenced by beats/panels
+  // Collect referenced photoIds
   const photoIds = Array.from(
     new Set([
       ...beats.map((b) => b.photoId).filter(Boolean),
@@ -40,7 +45,7 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
     ] as string[])
   );
 
-  // Fetch photo URLs for referenced ids
+  // Fetch photo URLs
   const photos = photoIds.length
     ? await prisma.photo.findMany({
         where: { id: { in: photoIds } },
@@ -53,14 +58,13 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       {/* Header */}
-      <header className="mb-8">
+      <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{story.title}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Room <span className="font-mono">{story.room.code}</span> · Published{' '}
-          {story.createdAt.toLocaleDateString()}
-        </p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{story.title}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Room <span className="font-mono">{story.room.code}</span> · Published{' '}
+            {story.createdAt.toLocaleDateString()}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <ShareLinkButton />
@@ -91,7 +95,7 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
                         fill
                         sizes="(max-width: 1024px) 100vw, 33vw"
                         className="object-cover"
-                        priority={i === 0} // first image gets priority for LCP
+                        priority={i === 0}
                         placeholder="blur"
                         blurDataURL={blurDataURL(16, 12)}
                       />
@@ -105,7 +109,7 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
         </aside>
       </section>
 
-      {/* Optional: Panels section (speech bubbles / extra narration) */}
+      {/* Optional: Panels */}
       {panels.length > 0 && (
         <section className="mt-10">
           <h2 className="text-xl font-semibold mb-3">Panels</h2>
@@ -123,7 +127,7 @@ export default async function SharedStoryPage({ params }: { params: { slug: stri
                         sizes="(max-width: 768px) 100vw, 50vw"
                         className="object-cover rounded"
                         placeholder="blur"
-                        blurDataURL={blurDataURL(16, 9)}                        
+                        blurDataURL={blurDataURL(16, 9)}
                       />
                     </div>
                   ) : null}
