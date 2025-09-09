@@ -5,13 +5,14 @@ import Image from 'next/image';
 import { blurDataURL } from '@/lib/blur';
 import RegenerateButton from '@/components/RegenerateButton';
 import ShareLinkButton from '@/components/ShareLinkButton';
+import HomeLink from '@/components/HomeLink';
+import Link from 'next/link';
 
 export const runtime = 'nodejs';
 
 type Beat = { photoId?: string; caption: string };
 type Panel = { index: number; photoId?: string; narration: string; bubbles: string[] };
 
-// NOTE: In Next 15, params may be a Promise. Await it.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const story = await prisma.story.findFirst({
@@ -22,7 +23,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: story.title };
 }
 
-// Same here: await params
 export default async function SharedStoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
@@ -37,7 +37,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
   const beats = (Array.isArray(story.beatsJson) ? story.beatsJson : []) as Beat[];
   const panels = (Array.isArray(story.panelMap) ? story.panelMap : []) as Panel[];
 
-  // Collect referenced photoIds
+  // Collect DB photo IDs referenced by beats/panels
   const photoIds = Array.from(
     new Set([
       ...beats.map((b) => b.photoId).filter(Boolean),
@@ -45,25 +45,60 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
     ] as string[])
   );
 
-  // Fetch photo URLs
+  // Fetch photos by DB id only
   const photos = photoIds.length
     ? await prisma.photo.findMany({
         where: { id: { in: photoIds } },
-        select: { id: true, storageUrl: true, publicId: true },
+        select: { id: true, storageUrl: true, width: true, height: true },
       })
     : [];
 
-  const photoUrlById = new Map(photos.map((p) => [p.id, p.storageUrl]));
+  type Hit = { url: string; w: number; h: number };
+  const byId = new Map<string, Hit>(
+    photos.map((p) => [
+      p.id,
+      {
+        url: p.storageUrl,
+        w: p.width && p.width > 0 ? p.width : 1200,
+        h: p.height && p.height > 0 ? p.height : 900,
+      },
+    ])
+  );
+  const resolve = (id?: string | null): Hit | null => (id ? byId.get(id) ?? null : null);
+
+  // Helper to render a responsive image (no `fill`, natural height for masonry)
+  const Img = ({
+    hit,
+    priority = false,
+  }: {
+    hit: Hit;
+    priority?: boolean;
+  }) => (
+    <Image
+      src={hit.url}
+      alt=""
+      width={hit.w}
+      height={hit.h}
+      sizes="100vw"
+      className="w-full h-auto object-cover rounded"
+      priority={priority}
+      placeholder="blur"
+      blurDataURL={blurDataURL(16, 12)}
+    />
+  );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main>
       {/* Header */}
-      <header className="mb-8 flex items-start justify-between gap-4">
+      <header className="mb-8 card p-5 flex items-start justify-between gap-6">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{story.title}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Room <span className="font-mono">{story.room.code}</span> · Published{' '}
-            {story.createdAt.toLocaleDateString()}
+          <p className="muted mt-1">
+            Room{' '}
+            <Link href={`/u/${story.room.code}`} className="font-mono underline hover:text-black">
+              {story.room.code}
+            </Link>{' '}
+            · Published {story.createdAt.toLocaleDateString()}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -72,36 +107,29 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </div>
       </header>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Narrative + Beats (beats now masonry) */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Narrative */}
-        <article className="lg:col-span-2">
+        <article className="lg:col-span-2 card p-6">
           <div className="prose max-w-none whitespace-pre-wrap leading-relaxed">
             {story.narrative}
           </div>
         </article>
 
-        {/* Beats (photo + caption) */}
-        <aside className="lg:col-span-1">
-          <ul className="space-y-4">
+        {/* Beats — masonry using CSS columns */}
+        <aside className="lg:col-span-1 card p-4">
+          <h2 className="text-sm font-semibold mb-3">Beats</h2>
+          {/* On small screens we give 2 columns; on large (narrow sidebar) force 1 */}
+          <ul className="columns-1 sm:columns-2 lg:columns-1 gap-3 [column-fill:_balance]">
             {beats.map((b, i) => {
-              const url = b.photoId ? photoUrlById.get(b.photoId) : null;
+              const hit = resolve(b.photoId);
+              if (!hit) return null;
               return (
-                <li key={i} className="border rounded-xl overflow-hidden">
-                  {url ? (
-                    <div className="relative w-full" style={{ aspectRatio: '4 / 3' }}>
-                      <Image
-                        src={url}
-                        alt=""
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 33vw"
-                        className="object-cover"
-                        priority={i === 0}
-                        placeholder="blur"
-                        blurDataURL={blurDataURL(16, 12)}
-                      />
-                    </div>
+                <li key={i} className="mb-3 break-inside-avoid rounded-xl border p-2 bg-white">
+                  <Img hit={hit} priority={i === 0} />
+                  {b.caption ? (
+                    <div className="mt-2 text-xs italic leading-snug text-gray-700">{b.caption}</div>
                   ) : null}
-                  <div className="p-3 text-sm italic">{b.caption}</div>
                 </li>
               );
             })}
@@ -109,30 +137,18 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </aside>
       </section>
 
-      {/* Optional: Panels */}
+      {/* Panels — masonry using CSS columns */}
       {panels.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-semibold mb-3">Panels</h2>
-          <ul className="grid md:grid-cols-2 gap-4">
+        <section className="mt-6 card p-5">
+          <h2 className="text-sm font-semibold mb-3">Panels</h2>
+          <ul className="columns-1 md:columns-2 gap-4 [column-fill:_balance]">
             {panels.map((p) => {
-              const url = p.photoId ? photoUrlById.get(p.photoId) : null;
+              const hit = resolve(p.photoId);
               return (
-                <li key={p.index} className="border rounded-xl p-4">
-                  {url ? (
-                    <div className="relative w-full mb-3" style={{ aspectRatio: '16 / 9' }}>
-                      <Image
-                        src={url}
-                        alt=""
-                        fill
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        className="object-cover rounded"
-                        placeholder="blur"
-                        blurDataURL={blurDataURL(16, 9)}
-                      />
-                    </div>
-                  ) : null}
-                  <div className="font-medium mb-2">Panel {p.index + 1}</div>
-                  <p className="text-sm text-gray-700 mb-2">{p.narration}</p>
+                <li key={p.index} className="mb-4 break-inside-avoid rounded-xl border p-3 bg-white">
+                  {hit ? <Img hit={hit} /> : null}
+                  <div className="mt-2 font-medium">Panel {p.index + 1}</div>
+                  <p className="text-sm text-gray-700 mb-1">{p.narration}</p>
                   {p.bubbles?.length ? (
                     <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
                       {p.bubbles.map((txt, i) => (

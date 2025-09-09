@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 type Props = {
-  url?: string;            // optional; defaults to current URL
+  url?: string;
   className?: string;
   label?: string;
 };
@@ -18,11 +18,7 @@ export default function ShareLinkButton({
 
   async function onClick() {
     try {
-      setErr(null);
-      const shareUrl =
-        url ??
-        (typeof window !== 'undefined' ? window.location.href : '');
-
+      const shareUrl = url ?? (typeof window !== 'undefined' ? window.location.href : '');
       if (!shareUrl) throw new Error('No URL to copy');
 
       await navigator.clipboard.writeText(shareUrl);
@@ -36,14 +32,9 @@ export default function ShareLinkButton({
 
   return (
     <div className={`relative ${className}`}>
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
-      >
+      <button onClick={onClick} className="btn btn-outline">
         <span aria-hidden>🔗</span> {label}
       </button>
-
-      {/* Tiny toast */}
       {copied && (
         <div className="absolute right-0 mt-2 rounded-md bg-black text-white text-xs px-2 py-1 shadow">
           Copied!
