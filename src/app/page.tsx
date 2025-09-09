@@ -3,7 +3,9 @@ import { prisma } from '@/lib/prisma';
 import RoomSwitcher from '@/components/RoomSwitcher';
 import Link from 'next/link';
 
-export const runtime = 'nodejs';
+export const runtime = 'nodejs';           // ensure Prisma-compatible runtime
+export const dynamic = 'force-dynamic';    // disable static caching/ISR
+export const revalidate = 0;               // belt-and-suspenders no-cache
 
 export default async function Page() {
   // Fetch recent rooms (limit to 10)
