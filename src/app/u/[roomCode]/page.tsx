@@ -8,6 +8,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type PageParams = { roomCode: string };
 
@@ -21,7 +23,6 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
       id: true,
       code: true,
       photos: {
-        // include dimensions for crisp, intrinsic rendering
         select: { id: true, storageUrl: true, publicId: true, width: true, height: true },
         orderBy: { createdAt: 'desc' },
         take: 60,
@@ -47,13 +48,11 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
     );
   }
 
-  // Initial gallery for UploadClient (can be either DB id or publicId)
   const initialGallery = room.photos.map((p) => ({
-    id: p.id, // standardized on DB id
+    id: p.id,
     url: p.storageUrl,
   }));
 
-  // Small helper to render an intrinsic image (no `fill`)
   const renderImg = (p: { storageUrl: string; width: number | null; height: number | null }, priority = false) => {
     const w = p.width && p.width > 0 ? p.width : 1200;
     const h = p.height && p.height > 0 ? p.height : 900;
@@ -135,7 +134,7 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
                 title={p.publicId || p.id}
               >
                 <a href={p.storageUrl} target="_blank" rel="noreferrer" className="block">
-                  {renderImg(p, i < 3 /* prioritize a few top items */)}
+                  {renderImg(p, i < 3)}
                 </a>
               </li>
             ))}

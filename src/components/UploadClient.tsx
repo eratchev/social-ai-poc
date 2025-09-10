@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 type GalleryItem = { id: string; url: string };
@@ -34,6 +34,8 @@ export default function UploadClient({
   roomCode,
   ownerHandle = 'devuser',
 }: UploadClientProps) {
+  const router = useRouter();
+
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [dragActive, setDragActive] = useState(false);
@@ -69,7 +71,7 @@ export default function UploadClient({
     }
   }
 
-  // ---------- Drag & Drop (supports Files + URL drops) ----------
+  // ---------- Drag & Drop (Files + URL drops) ----------
   const onDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault(); e.stopPropagation();
     setDragActive(true);
@@ -91,36 +93,30 @@ export default function UploadClient({
     e.preventDefault(); e.stopPropagation();
     setDragActive(false);
 
-    // Priority 1: actual Files
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       acceptFileList(e.dataTransfer.files);
       return;
     }
 
-    // Priority 2: URL(s) via text/uri-list or text/plain
     const items = e.dataTransfer.items ? Array.from(e.dataTransfer.items) : [];
     for (const it of items) {
       if (it.kind === 'string' && (it.type === 'text/uri-list' || it.type === 'text/plain')) {
         const url = await new Promise<string>(resolve => it.getAsString(resolve));
         const trimmed = url.trim();
         try {
-          // quick guard for a valid-ish URL
           const u = new URL(trimmed);
           if (u.protocol === 'http:' || u.protocol === 'https:') {
             const f = await urlToFile(trimmed);
             if (f) pushFiles([f]);
           }
-        } catch {
-          // not a URL; ignore
-        }
+        } catch { /* ignore non-URL */ }
       }
     }
   }, [acceptFileList, pushFiles]);
 
-  // ---------- Paste support (Cmd+V: image blob or URL) ----------
+  // ---------- Paste (Cmd+V: image blob or URL) ----------
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
-      // Image blob
       const items = e.clipboardData?.items;
       if (items && items.length) {
         const imgs: File[] = [];
@@ -136,7 +132,6 @@ export default function UploadClient({
           return;
         }
       }
-      // URL text
       const text = e.clipboardData?.getData('text/plain')?.trim();
       if (text) {
         try {
@@ -146,9 +141,7 @@ export default function UploadClient({
             const f = await urlToFile(text);
             if (f) pushFiles([f]);
           }
-        } catch {
-          // ignore non-URL paste
-        }
+        } catch { /* ignore non-URL paste */ }
       }
     };
     window.addEventListener('paste', onPaste);
@@ -219,21 +212,34 @@ export default function UploadClient({
       }),
     });
 
+    // instantly re-render server components (gallery count & list) without full reload
+    router.refresh();
+
     return { url: result.secure_url, public_id: result.public_id, meta: result };
   }
 
-  const startUpload = useCallback(async () => {
-    for (const file of files) {
-      setProgress((p) => ({ ...p, [file.name]: 0 }));
-      try {
-        await uploadToCloudinarySigned(file, (pct) =>
-          setProgress((p) => ({ ...p, [file.name]: pct }))
-        );
-      } catch (err) {
-        console.error('Upload error', err);
-        setProgress((p) => ({ ...p, [file.name]: -1 }));
+  // Upload concurrently (3 at a time) for speed
+  async function uploadMany(batch: File[], worker = 3) {
+    const queue = [...batch];
+    const workers = Array.from({ length: Math.min(worker, queue.length) }, async () => {
+      while (queue.length) {
+        const f = queue.shift()!;
+        try {
+          setProgress((p) => ({ ...p, [f.name]: 0 }));
+          await uploadToCloudinarySigned(f, (pct) =>
+            setProgress((p) => ({ ...p, [f.name]: pct }))
+          );
+        } catch {
+          setProgress((p) => ({ ...p, [f.name]: -1 }));
+        }
       }
-    }
+    });
+    await Promise.all(workers);
+  }
+
+  const startUpload = useCallback(async () => {
+    if (files.length === 0) return;
+    await uploadMany(files, 3);
     setFiles([]);
   }, [files]);
 
