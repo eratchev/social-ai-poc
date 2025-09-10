@@ -1,37 +1,38 @@
 // lib/story-llm.ts
-export type Beat = { photoId: string; caption: string };
-export type Panel = { index: number; photoId: string; narration: string; bubbles: string[] };
+import { getStoryProvider } from "./ai/providers";
+import type { Beat, Panel } from "./ai/structured";
 
 export async function generateFunnyStory(args: {
   photos: { id: string; url: string }[];
   style?: string;
 }) {
-  const { photos, style = 'quirky, kid-friendly' } = args;
+  const { photos, style } = args;
 
-  // Simple deterministic mock for POC
-  const beats: Beat[] = photos.map((p, i) => ({
-    photoId: p.id,
-    caption: `Beat #${i + 1}: This photo accidentally proves ${i % 2 ? 'time travel' : 'snack diplomacy'}.`,
-  }));
+  const provider = getStoryProvider();
 
-  const panels: Panel[] = photos.map((p, i) => ({
-    index: i,
-    photoId: p.id,
-    narration: `Panel ${i + 1}: Our heroes confront a ${i % 2 ? 'mischievous seagull' : 'mysterious vending machine'}.`,
-    bubbles: [`"Did that just happen?"`, `"I blame the sandwiches."`].slice(0, 1 + (i % 2)),
-  }));
+  // Step A: Beats
+  const beats: Beat[] = await provider.genBeats({ photos });
 
-  const narrative =
-    `In a ${style} romp, a group of friends tries to explain ` +
-    `how their camera captured a saga of snacks, seagulls, and suspicious coincidences. ` +
-    `Each new photo raises the stakes—and the number of pastry crumbs.`;
+  // Step B: Panels
+  const panels: Panel[] = await provider.genPanels({
+    beats,
+    photos,
+    panelCount: photos.length
+  });
+
+  // Step C: Narrative
+  const narrative = await provider.genNarrative({
+    beats,
+    style,
+    wordCount: 200
+  });
 
   return {
-    title: 'The Case of the Chaotic Camera',
+    title: "The Case of the Chaotic Camera",
     narrative,
     beatsJson: beats,
     panelMap: panels,
-    model: 'mock:v0',
-    prompt: 'internal-prompt-mock',
+    model: provider.modelName(),
+    prompt: provider.providerName()
   };
 }
