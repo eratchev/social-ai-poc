@@ -21,14 +21,14 @@ export async function generateFunnyStory(args: {
   });
 
   // Step C: Narrative
-  const narrative = await provider.genNarrative({
-    beats,
+  const { title, narrative } = await provider.genNarrative({
+    beats, // or beatsWithThumbs if you use that
     style,
-    wordCount: 200
+    wordCount: 200,
   });
 
   return {
-    title: "The Case of the Chaotic Camera",
+    title,
     narrative,
     beatsJson: beats,
     panelMap: panels,

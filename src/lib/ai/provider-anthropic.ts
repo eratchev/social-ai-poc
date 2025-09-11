@@ -8,6 +8,8 @@ import {
   type Panel,
 } from "./structured";
 import { AI_CFG } from "./config";
+import { enforcePhotoCoverage } from "./panels";
+import { parseTitleNarrative } from "./text";
 
 function inferMime(url: string): "image/jpeg" | "image/png" {
   const u = url.toLowerCase();
@@ -98,8 +100,9 @@ export class AnthropicProvider implements StoryProvider {
 
     const raw = resp.content?.[0]?.type === "text" ? resp.content[0].text : "{}";
     const json = safeJson<{ panels: unknown }>(raw ?? "{}");
-    const panels = validatePanels(json.panels);
-
+    const panelsRaw = validatePanels(json.panels);
+    const panels = enforcePhotoCoverage(panelsRaw, photos);
+    
     const validIds = new Set(photos.map(p => p.id));
     return panels.map((p, i) => ({
       ...p,
@@ -119,15 +122,20 @@ export class AnthropicProvider implements StoryProvider {
     tone?: string;
     style?: string;
     wordCount?: number;
-  }): Promise<string> {
+  }): Promise<{ title: string; narrative: string }> {
     const system = "You write short, cinematic micro-stories for families.";
     const userText = [
       `Write a ~${wordCount} word story from these beats.`,
-      "Keep paragraphs short and end on a light punchline.",
+      "",
+      "Output format (STRICT):",
+      "First line: the title of the story.",
+      "Then a blank line.",
+      "Then the story narrative.",
+      "",
       `Audience: ${audience}. Tone: ${tone}. Style: ${style}.`,
       `Beats (JSON): ${JSON.stringify(beats).slice(0, 8000)}`,
     ].join("\n");
-
+  
     const resp = await this.client.messages.create({
       model: MODEL,
       system,
@@ -135,7 +143,9 @@ export class AnthropicProvider implements StoryProvider {
       temperature: AI_CFG.TEMPERATURE,
       max_tokens: AI_CFG.MAX_TOKENS,
     });
-
-    return resp.content?.[0]?.type === "text" ? (resp.content[0].text ?? "").trim() : "";
+  
+    const raw =
+      resp.content?.[0]?.type === "text" ? (resp.content[0].text ?? "").trim() : "";
+    return parseTitleNarrative(raw);
   }
 }

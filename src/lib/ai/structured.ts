@@ -23,24 +23,56 @@ export const BeatSchema = z.object({
 });
 export const BeatsSchema = z.array(BeatSchema).min(3).max(12);
 
+export type Beat = z.infer<typeof BeatSchema>;
+
+/**
+ * Panel schemas
+ */
 export const PanelBubbleSchema = z.object({
   speaker: z.string().min(1).optional(),
   text: z.string().min(1).max(100),
   aside: z.boolean().optional(),
 });
 
-export const PanelSchema = z.object({
+// Accept bubble either as object or as plain string -> normalize to { text }
+const PanelBubbleInput = z.union([
+  PanelBubbleSchema,
+  z.string().min(1).max(100).transform((t) => ({ text: t })),
+]);
+
+const PanelBase = z.object({
   index: z.number().int().nonnegative(),
   photoId: z.string().min(1).optional(),
   narration: z.string().min(1).max(280).optional(),
-  bubbles: z.array(PanelBubbleSchema).max(3).optional(),
   sfx: z.array(z.string().min(1)).optional(),
   alt: z.string().min(1).max(160).optional(),
 });
-export const PanelsSchema = z.array(PanelSchema).min(1).max(24);
 
-export type Beat = z.infer<typeof BeatSchema>;
+// Input schema: bubbles may be strings or objects
+const PanelInputSchema = PanelBase.extend({
+  bubbles: z.array(PanelBubbleInput).max(3).optional(),
+});
+
+// Final normalized Panel schema (objects only)
+export const PanelSchema = PanelBase.extend({
+  bubbles: z.array(PanelBubbleSchema).max(3).optional(),
+});
+
 export type Panel = z.infer<typeof PanelSchema>;
+
+// Input parser that normalizes to the final shape
+export const PanelsSchemaInput = z
+  .array(PanelInputSchema)
+  .min(1)
+  .max(24)
+  .transform((panels) =>
+    panels.map((p) => ({
+      ...p,
+      bubbles: p.bubbles?.map((b) =>
+        "text" in b ? b : { text: String(b) }
+      ),
+    }))
+  );
 
 /**
  * Robust JSON cleanup + parsing for model outputs
@@ -56,7 +88,10 @@ export function safeJson<T>(raw: string): T {
     })
   );
   const last = Math.max(trimmed.lastIndexOf("}"), trimmed.lastIndexOf("]"));
-  const slice = first !== Number.MAX_SAFE_INTEGER && last > first ? trimmed.slice(first, last + 1) : trimmed;
+  const slice =
+    first !== Number.MAX_SAFE_INTEGER && last > first
+      ? trimmed.slice(first, last + 1)
+      : trimmed;
   return JSON.parse(slice) as T;
 }
 
@@ -64,8 +99,18 @@ export function safeJson<T>(raw: string): T {
  * Strong validators used by providers after parsing
  */
 export function validateBeats(json: unknown): Beat[] {
-  return BeatsSchema.parse(json);
+  const beats = BeatsSchema.parse(json);
+  // Safety: trim to 12 beats
+  return beats.slice(0, 12);
 }
+
 export function validatePanels(json: unknown): Panel[] {
-  return PanelsSchema.parse(json);
+  const normalized = PanelsSchemaInput.parse(json);
+  const panels = z.array(PanelSchema).parse(normalized);
+
+  // Safety: trim to 24 panels
+  return panels.map((p) => ({
+    ...p,
+    bubbles: p.bubbles ? p.bubbles.slice(0, 3) : undefined, // trim bubbles
+  })).slice(0, 24);
 }

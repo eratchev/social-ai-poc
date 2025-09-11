@@ -3,6 +3,8 @@ import type { Beat, Panel } from "./structured";
 
 export type Photo = { id: string; url: string; caption?: string };
 
+export type TitleNarrative = { title: string; narrative: string };
+
 export interface StoryProvider {
   genBeats(args: {
     photos: Photo[];
@@ -23,22 +25,15 @@ export interface StoryProvider {
     tone?: string;
     style?: string;
     wordCount?: number;
-  }): Promise<string>;
+  }): Promise<TitleNarrative>;
 
   providerName(): string;
   modelName(): string;
 }
 
-export function getStoryProvider(): StoryProvider {
+export function getStoryProvider() {
   const p = (process.env.AI_PROVIDER || "mock").toLowerCase();
-  if (p === "openai") {
-    const { OpenAIProvider } = require("./provider-openai");
-    return new OpenAIProvider();
-  }
-  if (p === "anthropic") {
-    const { AnthropicProvider } = require("./provider-anthropic");
-    return new AnthropicProvider();
-  }
-  const { MockProvider } = require("./provider-mock");
-  return new MockProvider();
+  if (p === "openai") return new (require("./provider-openai").OpenAIProvider)();
+  if (p === "anthropic") return new (require("./provider-anthropic").AnthropicProvider)();
+  return new (require("./provider-mock").MockProvider)();
 }

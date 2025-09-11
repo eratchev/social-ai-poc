@@ -10,8 +10,24 @@ import Link from 'next/link';
 
 export const runtime = 'nodejs';
 
-type Beat = { photoId?: string; caption: string };
-type Panel = { index: number; photoId?: string; narration: string; bubbles: string[] };
+// ✅ Updated types to match new schemas
+type Beat = {
+  index: number;
+  type: 'setup' | 'inciting' | 'rising' | 'climax' | 'twist' | 'resolution' | 'button' | string;
+  summary: string;
+  callouts?: string[];
+  imageRefs?: number[]; // note: indices into *input* photo order, not DB ids
+};
+
+type Bubble = { text: string; speaker?: string; aside?: boolean };
+type Panel = {
+  index: number;
+  photoId?: string | null;
+  narration?: string;
+  bubbles?: Bubble[];
+  sfx?: string[];
+  alt?: string;
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -37,12 +53,11 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
   const beats = (Array.isArray(story.beatsJson) ? story.beatsJson : []) as Beat[];
   const panels = (Array.isArray(story.panelMap) ? story.panelMap : []) as Panel[];
 
-  // Collect DB photo IDs referenced by beats/panels
+  // Collect DB photo IDs referenced by PANELS only (beats no longer carry photoIds)
   const photoIds = Array.from(
-    new Set([
-      ...beats.map((b) => b.photoId).filter(Boolean),
-      ...panels.map((p) => p.photoId).filter(Boolean),
-    ] as string[])
+    new Set(
+      panels.map((p) => p.photoId).filter(Boolean) as string[]
+    )
   );
 
   // Fetch photos by DB id only
@@ -107,7 +122,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </div>
       </header>
 
-      {/* Narrative + Beats (beats now masonry) */}
+      {/* Narrative + Beats */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Narrative */}
         <article className="lg:col-span-2 card p-6">
@@ -116,24 +131,22 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
           </div>
         </article>
 
-        {/* Beats — masonry using CSS columns */}
+        {/* Beats — now text summaries (beats no longer have photoId/caption) */}
         <aside className="lg:col-span-1 card p-4">
           <h2 className="text-sm font-semibold mb-3">Beats</h2>
-          {/* On small screens we give 2 columns; on large (narrow sidebar) force 1 */}
-          <ul className="columns-1 sm:columns-2 lg:columns-1 gap-3 [column-fill:_balance]">
-            {beats.map((b, i) => {
-              const hit = resolve(b.photoId);
-              if (!hit) return null;
-              return (
-                <li key={i} className="mb-3 break-inside-avoid rounded-xl border p-2 bg-white">
-                  <Img hit={hit} priority={i === 0} />
-                  {b.caption ? (
-                    <div className="mt-2 text-xs italic leading-snug text-gray-700">{b.caption}</div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          <ol className="space-y-2 list-decimal list-inside">
+            {beats.map((b) => (
+              <li key={b.index} className="text-sm">
+                <div className="font-medium capitalize">{b.type}</div>
+                <div className="text-gray-700">{b.summary}</div>
+                {b.callouts?.length ? (
+                  <div className="mt-1 text-xs text-gray-500">
+                    callouts: {b.callouts.join(', ')}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ol>
         </aside>
       </section>
 
@@ -143,18 +156,41 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
           <h2 className="text-sm font-semibold mb-3">Panels</h2>
           <ul className="columns-1 md:columns-2 gap-4 [column-fill:_balance]">
             {panels.map((p) => {
-              const hit = resolve(p.photoId);
+              const hit = resolve(p.photoId ?? undefined);
               return (
                 <li key={p.index} className="mb-4 break-inside-avoid rounded-xl border p-3 bg-white">
                   {hit ? <Img hit={hit} /> : null}
                   <div className="mt-2 font-medium">Panel {p.index + 1}</div>
-                  <p className="text-sm text-gray-700 mb-1">{p.narration}</p>
+
+                  {/* narration may be optional */}
+                  {p.narration ? (
+                    <p className="text-sm text-gray-700 mb-1">{p.narration}</p>
+                  ) : null}
+
+                  {/* ✅ render bubbles as objects */}
                   {p.bubbles?.length ? (
                     <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
-                      {p.bubbles.map((txt, i) => (
-                        <li key={i}>&quot;{txt}&quot;</li>
+                      {p.bubbles.map((b, i) => (
+                        <li key={i}>
+                          {b.speaker ? <strong>{b.speaker}: </strong> : null}
+                          {b.text}
+                        </li>
                       ))}
                     </ul>
+                  ) : null}
+
+                  {/* optional SFX */}
+                  {p.sfx?.length ? (
+                    <div className="mt-1 text-xs text-gray-500">
+                      SFX: {p.sfx.join(', ')}
+                    </div>
+                  ) : null}
+
+                  {/* optional alt */}
+                  {p.alt ? (
+                    <div className="mt-1 text-xs text-gray-400 italic">
+                      {p.alt}
+                    </div>
                   ) : null}
                 </li>
               );
