@@ -3,10 +3,13 @@
 @tailwind components;
 @tailwind utilities;
 
+
+.card { @apply rounded-2xl border bg-white shadow-sm; }
+.dark .card { @apply bg-zinc-900 border-zinc-800 shadow-none; }
+
 /* nicer card shadow + focus ring */
 /* stylelint-disable at-rule-no-unknown */
 @layer utilities {
-  .card { @apply rounded-2xl border bg-white shadow-sm; }
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm transition; }
   .btn-primary { @apply btn bg-black text-white hover:opacity-90 disabled:opacity-60; }
   .btn-outline { @apply btn border hover:bg-gray-50 disabled:opacity-60; }

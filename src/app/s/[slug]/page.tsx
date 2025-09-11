@@ -39,6 +39,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: story.title };
 }
 
+// 💬 Bubble chip for dialog lines
+function BubbleChip({ b }: { b: Bubble }) {
+  return (
+    <div
+      className={[
+        'inline-flex items-start gap-1 rounded-2xl px-3 py-1.5',
+        'border bg-white shadow-sm',
+        b.aside ? 'opacity-80 italic' : 'font-medium',
+      ].join(' ')}
+    >
+      {b.speaker ? <span className="text-gray-800">{b.speaker}:</span> : null}
+      <span className="text-gray-700">{b.text}</span>
+    </div>
+  );
+}
+
 export default async function SharedStoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
@@ -55,9 +71,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
 
   // Collect DB photo IDs referenced by PANELS only (beats no longer carry photoIds)
   const photoIds = Array.from(
-    new Set(
-      panels.map((p) => p.photoId).filter(Boolean) as string[]
-    )
+    new Set(panels.map((p) => p.photoId).filter(Boolean) as string[])
   );
 
   // Fetch photos by DB id only
@@ -107,8 +121,12 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
       {/* Header */}
       <header className="mb-8 card p-5 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{story.title}</h1>
-          <p className="muted mt-1">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+            <span className="bg-gradient-to-r from-purple-700 via-pink-600 to-orange-500 bg-clip-text text-transparent">
+              {story.title}
+            </span>
+          </h1>
+          <p className="muted mt-1 text-sm">
             Room{' '}
             <Link href={`/u/${story.room.code}`} className="font-mono underline hover:text-black">
               {story.room.code}
@@ -126,21 +144,21 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Narrative */}
         <article className="lg:col-span-2 card p-6">
-          <div className="prose max-w-none whitespace-pre-wrap leading-relaxed">
+          <div className="prose prose-lg max-w-none leading-relaxed text-gray-900 whitespace-pre-wrap">
             {story.narrative}
           </div>
         </article>
 
-        {/* Beats — now text summaries (beats no longer have photoId/caption) */}
+        {/* Beats — text summaries */}
         <aside className="lg:col-span-1 card p-4">
           <h2 className="text-sm font-semibold mb-3">Beats</h2>
-          <ol className="space-y-2 list-decimal list-inside">
+          <ol className="space-y-3 list-decimal list-inside">
             {beats.map((b) => (
-              <li key={b.index} className="text-sm">
-                <div className="font-medium capitalize">{b.type}</div>
-                <div className="text-gray-700">{b.summary}</div>
+              <li key={b.index} className="text-[15px]">
+                <div className="font-semibold capitalize text-gray-800">{b.type}</div>
+                <div className="text-gray-700 leading-snug">{b.summary}</div>
                 {b.callouts?.length ? (
-                  <div className="mt-1 text-xs text-gray-500">
+                  <div className="mt-1 text-[11px] text-gray-500">
                     callouts: {b.callouts.join(', ')}
                   </div>
                 ) : null}
@@ -158,39 +176,41 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
             {panels.map((p) => {
               const hit = resolve(p.photoId ?? undefined);
               return (
-                <li key={p.index} className="mb-4 break-inside-avoid rounded-xl border p-3 bg-white">
+                <li key={p.index} className="mb-4 break-inside-avoid rounded-2xl border p-3 bg-white shadow-sm">
                   {hit ? <Img hit={hit} /> : null}
-                  <div className="mt-2 font-medium">Panel {p.index + 1}</div>
 
-                  {/* narration may be optional */}
+                  <div className="mt-3 flex items-baseline justify-between">
+                    <div className="text-sm font-semibold tracking-wide text-gray-700">
+                      Panel {p.index + 1}
+                    </div>
+                    {p.sfx?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {p.sfx.map((s, i) => (
+                          <span
+                            key={i}
+                            className="inline-block rounded-md border px-2 py-0.5 text-[11px] uppercase tracking-wide text-gray-700"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
                   {p.narration ? (
-                    <p className="text-sm text-gray-700 mb-1">{p.narration}</p>
+                    <p className="mt-1 text-[15px] leading-snug text-gray-800">{p.narration}</p>
                   ) : null}
 
-                  {/* ✅ render bubbles as objects */}
                   {p.bubbles?.length ? (
-                    <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {p.bubbles.map((b, i) => (
-                        <li key={i}>
-                          {b.speaker ? <strong>{b.speaker}: </strong> : null}
-                          {b.text}
-                        </li>
+                        <BubbleChip key={i} b={b} />
                       ))}
-                    </ul>
-                  ) : null}
-
-                  {/* optional SFX */}
-                  {p.sfx?.length ? (
-                    <div className="mt-1 text-xs text-gray-500">
-                      SFX: {p.sfx.join(', ')}
                     </div>
                   ) : null}
 
-                  {/* optional alt */}
                   {p.alt ? (
-                    <div className="mt-1 text-xs text-gray-400 italic">
-                      {p.alt}
-                    </div>
+                    <div className="mt-2 text-[11px] text-gray-500 italic">{p.alt}</div>
                   ) : null}
                 </li>
               );
