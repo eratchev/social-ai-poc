@@ -5,18 +5,17 @@ import Image from 'next/image';
 import { blurDataURL } from '@/lib/blur';
 import RegenerateButton from '@/components/RegenerateButton';
 import ShareLinkButton from '@/components/ShareLinkButton';
-import HomeLink from '@/components/HomeLink';
 import Link from 'next/link';
 
 export const runtime = 'nodejs';
 
-// ✅ Updated types to match new schemas
+// Types aligned with your schemas
 type Beat = {
   index: number;
   type: 'setup' | 'inciting' | 'rising' | 'climax' | 'twist' | 'resolution' | 'button' | string;
   summary: string;
   callouts?: string[];
-  imageRefs?: number[]; // note: indices into *input* photo order, not DB ids
+  imageRefs?: number[];
 };
 
 type Bubble = { text: string; speaker?: string; aside?: boolean };
@@ -39,18 +38,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: story.title };
 }
 
-// 💬 Bubble chip for dialog lines
+// 💬 Dialog bubble chip (dark-mode aware)
 function BubbleChip({ b }: { b: Bubble }) {
   return (
     <div
       className={[
         'inline-flex items-start gap-1 rounded-2xl px-3 py-1.5',
-        'border bg-white shadow-sm',
+        'border bg-white shadow-sm text-zinc-700',
+        'dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200',
         b.aside ? 'opacity-80 italic' : 'font-medium',
       ].join(' ')}
     >
-      {b.speaker ? <span className="text-gray-800">{b.speaker}:</span> : null}
-      <span className="text-gray-700">{b.text}</span>
+      {b.speaker ? <span className="text-zinc-800 dark:text-zinc-100">{b.speaker}:</span> : null}
+      <span>{b.text}</span>
     </div>
   );
 }
@@ -69,10 +69,8 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
   const beats = (Array.isArray(story.beatsJson) ? story.beatsJson : []) as Beat[];
   const panels = (Array.isArray(story.panelMap) ? story.panelMap : []) as Panel[];
 
-  // Collect DB photo IDs referenced by PANELS only (beats no longer carry photoIds)
-  const photoIds = Array.from(
-    new Set(panels.map((p) => p.photoId).filter(Boolean) as string[])
-  );
+  // Collect DB photo IDs referenced by PANELS only
+  const photoIds = Array.from(new Set(panels.map((p) => p.photoId).filter(Boolean) as string[]));
 
   // Fetch photos by DB id only
   const photos = photoIds.length
@@ -116,19 +114,25 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
     />
   );
 
+  // Convert narrative text into <p> elements so typography styles apply in dark mode
+  const narrativeParagraphs = (story.narrative ?? '')
+    .trim()
+    .split(/\n{2,}/)
+    .filter(Boolean);
+
   return (
     <main>
       {/* Header */}
       <header className="mb-8 card p-5 flex items-start justify-between gap-6">
         <div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-            <span className="bg-gradient-to-r from-purple-700 via-pink-600 to-orange-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-purple-700 via-pink-600 to-orange-500 bg-clip-text text-transparent dark:from-purple-300 dark:via-pink-300 dark:to-orange-200">
               {story.title}
             </span>
           </h1>
           <p className="muted mt-1 text-sm">
             Room{' '}
-            <Link href={`/u/${story.room.code}`} className="font-mono underline hover:text-black">
+            <Link href={`/u/${story.room.code}`} className="font-mono underline hover:text-black dark:hover:text-white">
               {story.room.code}
             </Link>{' '}
             · Published {story.createdAt.toLocaleDateString()}
@@ -144,21 +148,25 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Narrative */}
         <article className="lg:col-span-2 card p-6">
-          <div className="prose prose-lg max-w-none leading-relaxed text-gray-900 whitespace-pre-wrap">
-            {story.narrative}
+          <div className="prose prose-lg max-w-none leading-relaxed text-zinc-900 dark:text-zinc-100 dark:prose-invert">
+            {narrativeParagraphs.length > 0 ? (
+              narrativeParagraphs.map((p, i) => <p key={i}>{p}</p>)
+            ) : (
+              <p>{story.narrative}</p>
+            )}
           </div>
         </article>
 
         {/* Beats — text summaries */}
         <aside className="lg:col-span-1 card p-4">
-          <h2 className="text-sm font-semibold mb-3">Beats</h2>
+          <h2 className="text-sm font-semibold mb-3 text-zinc-800 dark:text-zinc-200">Beats</h2>
           <ol className="space-y-3 list-decimal list-inside">
             {beats.map((b) => (
               <li key={b.index} className="text-[15px]">
-                <div className="font-semibold capitalize text-gray-800">{b.type}</div>
-                <div className="text-gray-700 leading-snug">{b.summary}</div>
+                <div className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{b.type}</div>
+                <div className="text-zinc-700 dark:text-zinc-300 leading-snug">{b.summary}</div>
                 {b.callouts?.length ? (
-                  <div className="mt-1 text-[11px] text-gray-500">
+                  <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
                     callouts: {b.callouts.join(', ')}
                   </div>
                 ) : null}
@@ -176,11 +184,15 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
             {panels.map((p) => {
               const hit = resolve(p.photoId ?? undefined);
               return (
-                <li key={p.index} className="mb-4 break-inside-avoid rounded-2xl border p-3 bg-white shadow-sm">
+                <li
+                  key={p.index}
+                  className="mb-4 break-inside-avoid rounded-2xl border p-3 bg-white shadow-sm
+                             dark:bg-zinc-900 dark:border-zinc-800 dark:shadow-none"
+                >
                   {hit ? <Img hit={hit} /> : null}
 
                   <div className="mt-3 flex items-baseline justify-between">
-                    <div className="text-sm font-semibold tracking-wide text-gray-700">
+                    <div className="text-sm font-semibold tracking-wide text-zinc-700 dark:text-zinc-300">
                       Panel {p.index + 1}
                     </div>
                     {p.sfx?.length ? (
@@ -188,7 +200,8 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
                         {p.sfx.map((s, i) => (
                           <span
                             key={i}
-                            className="inline-block rounded-md border px-2 py-0.5 text-[11px] uppercase tracking-wide text-gray-700"
+                            className="inline-block rounded-md border px-2 py-0.5 text-[11px] uppercase tracking-wide
+                                       text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
                           >
                             {s}
                           </span>
@@ -198,7 +211,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
                   </div>
 
                   {p.narration ? (
-                    <p className="mt-1 text-[15px] leading-snug text-gray-800">{p.narration}</p>
+                    <p className="mt-1 text-[15px] leading-snug text-zinc-800 dark:text-zinc-200">{p.narration}</p>
                   ) : null}
 
                   {p.bubbles?.length ? (
@@ -210,7 +223,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
                   ) : null}
 
                   {p.alt ? (
-                    <div className="mt-2 text-[11px] text-gray-500 italic">{p.alt}</div>
+                    <div className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400 italic">{p.alt}</div>
                   ) : null}
                 </li>
               );
