@@ -1,3 +1,4 @@
+// lib/ai/provider-openai.ts
 import OpenAI from "openai";
 import type { StoryProvider, Photo } from "./providers";
 import {
@@ -6,6 +7,7 @@ import {
   validatePanels,
   type Beat,
   type Panel,
+  COMIC_LIMITS, // ✅ use the caps from structured.ts
 } from "./structured";
 import { AI_CFG } from "./config";
 import { enforcePhotoCoverage } from "./panels";
@@ -17,7 +19,12 @@ import type {
   ChatCompletionContentPart,
 } from "openai/resources/chat/completions";
 
-function makeUserContentWithImages(text: string, imageUrls: string[]): ChatCompletionContentPart[] {
+/* ---------------------------------- utils ---------------------------------- */
+
+function makeUserContentWithImages(
+  text: string,
+  imageUrls: string[]
+): ChatCompletionContentPart[] {
   const content: ChatCompletionContentPart[] = [{ type: "text", text }];
   for (const url of imageUrls) {
     content.push({ type: "image_url", image_url: { url } });
@@ -25,13 +32,42 @@ function makeUserContentWithImages(text: string, imageUrls: string[]): ChatCompl
   return content;
 }
 
+// Word clamp by word count, not characters — nicer for comics
+function clampWords(s = "", maxWords = 10) {
+  const parts = s.trim().split(/\s+/);
+  if (parts.length <= maxWords) return s.trim();
+  return parts.slice(0, maxWords).join(" ").replace(/[.,;:!?-]*$/, "…");
+}
+
+// Extra safety pass to enforce comic caps after zod validation
+function enforceComicCaps(panels: Panel[]): Panel[] {
+  return panels.map((p) => {
+    const narration = p.narration
+      ? clampWords(p.narration, Math.min(12, COMIC_LIMITS.narrationMax)) // ~words, not chars
+      : p.narration;
+    const bubbles = (p.bubbles ?? [])
+      .slice(0, COMIC_LIMITS.bubblesPerPanel)
+      .map((b) => ({
+        ...b,
+        text: clampWords(b.text, Math.min(10, COMIC_LIMITS.bubbleTextMax)), // ~words
+      }));
+    return { ...p, narration, bubbles };
+  });
+}
+
 const MODEL = AI_CFG.MODEL || "gpt-4o-mini";
+
+/* --------------------------------- provider -------------------------------- */
 
 export class OpenAIProvider implements StoryProvider {
   private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-  providerName() { return "openai"; }
-  modelName() { return MODEL; }
+  providerName() {
+    return "openai";
+  }
+  modelName() {
+    return MODEL;
+  }
 
   async genBeats({
     photos,
@@ -44,11 +80,14 @@ export class OpenAIProvider implements StoryProvider {
     tone?: string;
     style?: string;
   }): Promise<Beat[]> {
-    const system = "You are a storyboard editor for a kid-friendly humorous comic. Return strict JSON.";
+    const system =
+      "You are a storyboard editor for a humorous comic. Keep beats short and visual. Return strict JSON.";
+
     const text = [
-      "Create an outline of 5–7 beats for a short, kid-friendly humorous story.",
+      "Create an outline of 5–7 comic beats grounded in the attached photos.",
       `Audience: ${audience}. Tone: ${tone}. Style: ${style}.`,
-      "Each beat: index, type (setup|inciting|rising|climax|twist|resolution|button), summary (1–2 sentences), callouts[], imageRefs[] (indices by the provided order).",
+      `Each beat: index, type (setup|inciting|rising|climax|twist|resolution|button),`,
+      `summary (≤ ${COMIC_LIMITS.beatSummaryMax} chars, 1 short sentence), callouts[], imageRefs[] (indices by provided order).`,
       'Return STRICT JSON only: {"beats": Beat[] }',
       "",
       "Example beats JSON:",
@@ -64,7 +103,7 @@ export class OpenAIProvider implements StoryProvider {
           {
             "index": 1,
             "type": "rising",
-            "summary": "They attempt a fancy trick; chaos and snacks ensue.",
+            "summary": "They try a trick; the snack timeline gets weird.",
             "callouts": ["spin","gasp"],
             "imageRefs": [1]
           }
@@ -77,7 +116,13 @@ export class OpenAIProvider implements StoryProvider {
     const messages: ChatCompletionMessageParam[] = AI_CFG.VISION_BEATS
       ? [
           { role: "system", content: system },
-          { role: "user", content: makeUserContentWithImages(text, photos.map(p => p.url)) },
+          {
+            role: "user",
+            content: makeUserContentWithImages(
+              text,
+              photos.map((p) => p.url)
+            ),
+          },
         ]
       : [
           { role: "system", content: system },
@@ -116,14 +161,24 @@ export class OpenAIProvider implements StoryProvider {
     photos: Photo[];
     panelCount: number;
   }): Promise<Panel[]> {
-    const system = "You are a comic scriptwriter. Convert beats to panels. Return strict JSON.";
+    const system =
+      "You are a comic scriptwriter. Convert beats to panels. Return strict JSON.";
+
     const text = [
       `Produce ${panelCount} panels from the provided beats.`,
-      "Each panel: index, photoId (must be one of the provided ids), narration (<= 25 words),",
-      "bubbles (0–2, each <= 12 words, optional speaker), optional sfx[], alt.",
-      "Rules:",
+      "",
+      "Comic rules:",
+      `- Prefer *speech bubbles* over narration.`,
+      `- Per panel: ONE narration (6–12 words max), and 0–${COMIC_LIMITS.bubblesPerPanel} bubbles (≤ 10 words each).`,
+      `- Keep it punchy and visual; avoid stage directions.`,
+      "",
+      "JSON fields per panel:",
+      "index, photoId (one of provided ids), narration, bubbles[{text,speaker?}], sfx[], alt.",
+      "",
+      "Photo usage rules:",
       "- Use EACH provided photoId at least once before reusing any photo.",
       "- Do NOT invent ids; only choose from the provided ids.",
+      "",
       'Return STRICT JSON only: {"panels": Panel[] }',
       "",
       "Example panel JSON:",
@@ -132,7 +187,7 @@ export class OpenAIProvider implements StoryProvider {
           {
             "index": 0,
             "photoId": "ph_01",
-            "narration": "Warm-up turns into a perfectly unplanned routine.",
+            "narration": "Warm-up turns into a wild routine.",
             "bubbles": [
               { "speaker": "Puppy", "text": "I do strategy AND snacks." }
             ],
@@ -149,7 +204,13 @@ export class OpenAIProvider implements StoryProvider {
     const messages: ChatCompletionMessageParam[] = AI_CFG.VISION_PANELS
       ? [
           { role: "system", content: system },
-          { role: "user", content: makeUserContentWithImages(text, photos.map(p => p.url)) },
+          {
+            role: "user",
+            content: makeUserContentWithImages(
+              text,
+              photos.map((p) => p.url)
+            ),
+          },
         ]
       : [
           { role: "system", content: system },
@@ -165,14 +226,24 @@ export class OpenAIProvider implements StoryProvider {
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
     const json = safeJson<{ panels: unknown }>(raw);
-    const panelsRaw = validatePanels(json.panels);
-    const panels = enforcePhotoCoverage(panelsRaw, photos);
+
+    // zod-validate + normalize (strings→objects, caps from structured.ts)
+    const panelsValidated = validatePanels(json.panels);
+
+    // ensure each photo used at least once before reuse
+    const panelsCovered = enforcePhotoCoverage(panelsValidated, photos);
+
+    // final safety: clamp by word counts (not just char caps) for comic feel
+    const panels = enforceComicCaps(panelsCovered);
 
     // Ensure valid photoId; fallback by index if missing
-    const validIds = new Set(photos.map(p => p.id));
+    const validIds = new Set(photos.map((p) => p.id));
     return panels.map((p, i) => ({
       ...p,
-      photoId: p.photoId && validIds.has(p.photoId) ? p.photoId : photos[i % photos.length].id,
+      photoId:
+        p.photoId && validIds.has(p.photoId)
+          ? p.photoId
+          : photos[i % photos.length].id,
     }));
   }
 
@@ -181,7 +252,7 @@ export class OpenAIProvider implements StoryProvider {
     audience = "kids-10-12",
     tone = "wholesome",
     style = "funny",
-    wordCount = 200,
+    wordCount = 90, // ✅ shorter blurb by default (2–3 lines)
   }: {
     beats: Beat[];
     audience?: string;
@@ -189,31 +260,33 @@ export class OpenAIProvider implements StoryProvider {
     style?: string;
     wordCount?: number;
   }): Promise<{ title: string; narrative: string }> {
-    const system = "You write short, cinematic micro-stories for families.";
+    const system = "You write tiny punchy blurbs for comics.";
+
     const user = [
-      `Write a ~${wordCount} word story from these beats.`,
+      `Write a ~${wordCount} word blurb in 2–3 short lines (not a scene-by-scene recap).`,
+      "End on a light punchline.",
       "",
       "Output format (STRICT):",
       "First line: the title of the story.",
       "Then a blank line.",
-      "Then the story narrative.",
+      "Then the blurb.",
       "",
       `Audience: ${audience}. Tone: ${tone}. Style: ${style}.`,
       `Beats (JSON): ${JSON.stringify(beats).slice(0, 8000)}`,
     ].join("\n");
-  
+
     const messages: ChatCompletionMessageParam[] = [
       { role: "system", content: system },
       { role: "user", content: user },
     ];
-  
+
     const resp = await this.client.chat.completions.create({
       model: MODEL,
       messages,
       temperature: AI_CFG.TEMPERATURE,
       max_tokens: AI_CFG.MAX_TOKENS,
     });
-  
+
     const raw = (resp.choices?.[0]?.message?.content ?? "").trim();
     return parseTitleNarrative(raw);
   }

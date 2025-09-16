@@ -9,6 +9,8 @@ import Link from 'next/link';
 
 export const runtime = 'nodejs';
 
+const SHOW_BEATS = false; // feature flag
+
 // Types aligned with your schemas
 type Beat = {
   index: number;
@@ -158,22 +160,25 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </article>
 
         {/* Beats — text summaries */}
-        <aside className="lg:col-span-1 card p-4">
-          <h2 className="text-sm font-semibold mb-3 text-zinc-800 dark:text-zinc-200">Beats</h2>
-          <ol className="space-y-3 list-decimal list-inside">
-            {beats.map((b) => (
-              <li key={b.index} className="text-[15px]">
-                <div className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{b.type}</div>
-                <div className="text-zinc-700 dark:text-zinc-300 leading-snug">{b.summary}</div>
-                {b.callouts?.length ? (
-                  <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    callouts: {b.callouts.join(', ')}
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </aside>
+        {SHOW_BEATS && (
+          <aside className="lg:col-span-1 card p-4">
+            <h2 className="text-sm font-semibold mb-3 text-zinc-800 dark:text-zinc-200">Beats</h2>
+            <ol className="space-y-3 list-decimal list-inside">
+              {beats.map((b) => (
+                <li key={b.index} className="text-[15px]">
+                  <div className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">{b.type}</div>
+                  <div className="text-zinc-700 dark:text-zinc-300 leading-snug">{b.summary}</div>
+                  {b.callouts?.length ? (
+                    <div className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      callouts: {b.callouts.join(', ')}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </aside>
+        )}
+
       </section>
 
       {/* Panels — masonry using CSS columns */}

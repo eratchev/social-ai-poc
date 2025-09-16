@@ -8,6 +8,10 @@ type Props = {
   ownerHandle?: string;
   className?: string;
   label?: string;
+  provider?: 'openai' | 'anthropic' | 'mock';
+  comicAudience?: 'kids' | 'adults';
+  style?: string;
+  tone?: string;
 };
 
 export default function GenerateStoryButton({
@@ -15,6 +19,10 @@ export default function GenerateStoryButton({
   ownerHandle = 'devuser',
   className = '',
   label = 'Generate Story',
+  provider,
+  comicAudience = 'kids',
+  style,
+  tone,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -25,16 +33,29 @@ export default function GenerateStoryButton({
       setLoading(true);
       setErr(null);
 
+      // POST → /api/story with knobs
       const createRes = await fetch('/api/story', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ roomCode, ownerHandle }),
+        body: JSON.stringify({
+          roomCode,
+          ownerHandle,
+          provider,
+          comicAudience,
+          style,
+          tone,
+        }),
       });
-      if (!createRes.ok) throw new Error((await createRes.json()).error || 'Failed creating story');
+      if (!createRes.ok) {
+        throw new Error((await createRes.json()).error || 'Failed creating story');
+      }
       const { id } = await createRes.json();
 
+      // then create share slug
       const shareRes = await fetch(`/api/story/${id}/share`, { method: 'POST' });
-      if (!shareRes.ok) throw new Error((await shareRes.json()).error || 'Failed sharing story');
+      if (!shareRes.ok) {
+        throw new Error((await shareRes.json()).error || 'Failed sharing story');
+      }
       const { shareSlug } = await shareRes.json();
 
       router.push(`/s/${shareSlug}`);
@@ -55,9 +76,26 @@ export default function GenerateStoryButton({
       >
         {loading ? (
           <>
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden>
-              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-              <path d="M22 12a10 10 0 0 1-10 10" fill="none" stroke="currentColor" strokeWidth="2" />
+            <svg
+              className="h-4 w-4 animate-spin"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                opacity="0.25"
+              />
+              <path
+                d="M22 12a10 10 0 0 1-10 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
             </svg>
             Generating…
           </>

@@ -1,7 +1,7 @@
 // app/u/[roomCode]/page.tsx
 import { prisma } from '@/lib/prisma';
 import UploadClient from '@/components/UploadClient';
-import GenerateStoryButton from '@/components/GenerateStoryButton';
+import StoryControls from '@/components/StoryControls';
 import HomeLink from '@/components/HomeLink';
 import ShareStoryQuick from '@/components/ShareStoryQuick';
 import Link from 'next/link';
@@ -83,7 +83,7 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
             <Link href={`/u/${room.code}`} className="btn btn-outline">↻ Refresh</Link>
           </div>
         </div>
-        <GenerateStoryButton roomCode={room.code} />
+        <StoryControls roomCode={room.code} />
       </header>
 
       {/* Recent stories */}
