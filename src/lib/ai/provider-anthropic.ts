@@ -55,7 +55,7 @@ function enforceComicCaps(panels: Panel[]): Panel[] {
 /* --------------------------------- config ---------------------------------- */
 
 const CFG = getCfg("anthropic");
-const MODEL = CFG.MODEL || "claude-3-5-sonnet";
+const MODEL = CFG.MODEL || "claude-3-5-sonnet-latest";
 
 /* -------------------------------- provider --------------------------------- */
 

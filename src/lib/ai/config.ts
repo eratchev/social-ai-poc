@@ -51,7 +51,7 @@ const OPENAI_DEFAULTS: ProviderConfig = {
 };
 
 const ANTHROPIC_DEFAULTS: ProviderConfig = {
-  MODEL: "claude-3-5-sonnet",
+  MODEL: "claude-3-5-sonnet-latest",
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
