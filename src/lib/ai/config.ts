@@ -19,31 +19,34 @@ function num(v: unknown, def: number) {
  * - Finally falls back to sane hardcoded defaults.
  *
  * OpenAI envs (all optional):
- *   OPENAI_MODEL
+ *   OPENAI_MODEL                      (legacy single/default)
+ *   OPENAI_MODEL_FAST | _BALANCED | _PREMIUM  (new preset overrides)
  *   OPENAI_TEMPERATURE
  *   OPENAI_MAX_TOKENS
  *   OPENAI_VISION_BEATS
  *   OPENAI_VISION_PANELS
  *
  * Anthropic envs (all optional):
- *   ANTHROPIC_MODEL
+ *   ANTHROPIC_MODEL                   (legacy single/default)
+ *   ANTHROPIC_MODEL_FAST | _BALANCED | _PREMIUM (new preset overrides)
  *   ANTHROPIC_TEMPERATURE
  *   ANTHROPIC_MAX_TOKENS
  *   ANTHROPIC_VISION_BEATS
  *   ANTHROPIC_VISION_PANELS
- *
  */
 
 export type ProviderConfig = {
-  MODEL: string;
+  MODEL: string;              // legacy single/default model id
   TEMPERATURE: number;
   MAX_TOKENS: number;
   VISION_BEATS: boolean;
   VISION_PANELS: boolean;
 };
 
+export type Quality = "fast" | "balanced" | "premium";
+
 const OPENAI_DEFAULTS: ProviderConfig = {
-  MODEL: "gpt-4o-mini",
+  MODEL: "gpt-4o-mini", // legacy default; kept for compatibility
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
@@ -51,7 +54,7 @@ const OPENAI_DEFAULTS: ProviderConfig = {
 };
 
 const ANTHROPIC_DEFAULTS: ProviderConfig = {
-  MODEL: "claude-3-5-sonnet-latest",
+  MODEL: "claude-3-5-sonnet-latest", // make sure your key sees this id
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
@@ -85,4 +88,46 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
     VISION_BEATS: false,
     VISION_PANELS: false,
   };
+}
+
+/**
+ * Resolve a concrete model ID from a quality preset.
+ * Order of precedence:
+ *   1) Provider-specific QUALITY env (e.g., ANTHROPIC_MODEL_FAST)
+ *   2) Provider-specific default QUALITY fallback (hardcoded below)
+ *   3) Provider's legacy single MODEL from getCfg(kind)
+ */
+export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
+  const cfg = getCfg(kind);
+  const quality = q || "balanced";
+
+  if (kind === "openai") {
+    const envMap: Record<Quality, string | undefined> = {
+      fast: process.env.OPENAI_MODEL_FAST,
+      balanced: process.env.OPENAI_MODEL_BALANCED,
+      premium: process.env.OPENAI_MODEL_PREMIUM,
+    };
+    const defaults: Record<Quality, string> = {
+      fast: "gpt-4o-mini",
+      balanced: cfg.MODEL || "gpt-4o-mini",
+      premium: cfg.MODEL || "gpt-4o", // override in env if you want a pricier tier
+    };
+    return envMap[quality] || defaults[quality] || cfg.MODEL;
+  }
+
+  if (kind === "anthropic") {
+    const envMap: Record<Quality, string | undefined> = {
+      fast: process.env.ANTHROPIC_MODEL_FAST,
+      balanced: process.env.ANTHROPIC_MODEL_BALANCED,
+      premium: process.env.ANTHROPIC_MODEL_PREMIUM,
+    };
+    const defaults: Record<Quality, string> = {
+      fast: "claude-3-haiku-20240307",             // safe/light default
+      balanced: cfg.MODEL || "claude-3-5-sonnet-latest",
+      premium: cfg.MODEL || "claude-3-5-sonnet-latest", // bump via env when ready
+    };
+    return envMap[quality] || defaults[quality] || cfg.MODEL;
+  }
+
+  return cfg.MODEL;
 }

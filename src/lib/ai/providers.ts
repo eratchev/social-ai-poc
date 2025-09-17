@@ -2,9 +2,9 @@
 import type { Beat, Panel } from "./structured";
 
 export type ComicAudience = "kids" | "adults";
+export type Quality = "fast" | "balanced" | "premium";
 
 export type Photo = { id: string; url: string; caption?: string };
-
 export type TitleNarrative = { title: string; narrative: string };
 
 export interface StoryProvider {
@@ -14,6 +14,7 @@ export interface StoryProvider {
     tone?: string;
     style?: string;
     comicAudience?: ComicAudience; // optional preset knob
+    quality?: Quality;             // NEW: quality preset -> model selection
   }): Promise<Beat[]>;
 
   genPanels(args: {
@@ -21,6 +22,7 @@ export interface StoryProvider {
     photos: Photo[];
     panelCount: number;
     comicAudience?: ComicAudience; // optional preset knob
+    quality?: Quality;             // NEW
   }): Promise<Panel[]>;
 
   genNarrative(args: {
@@ -30,10 +32,11 @@ export interface StoryProvider {
     style?: string;
     wordCount?: number;
     comicAudience?: ComicAudience; // optional preset knob
+    quality?: Quality;             // NEW
   }): Promise<TitleNarrative>;
 
   providerName(): string;
-  modelName(): string;
+  modelName(): string; // returns the default model for the provider (legacy)
 }
 
 export type ProviderKind = "openai" | "anthropic" | "mock";
@@ -51,7 +54,7 @@ export function resolveDefaultProvider(): ProviderKind {
 /**
  * Explicit factory: construct a provider by kind.
  */
-export function getProvider(kind: ProviderKind): StoryProvider {
+export function getProvider(kind: ProviderKind) {
   if (kind === "openai") {
     const { OpenAIProvider } = require("./provider-openai");
     return new OpenAIProvider();
@@ -69,7 +72,7 @@ export function getProvider(kind: ProviderKind): StoryProvider {
  * - If kind is provided, use it.
  * - If omitted, fall back to resolveDefaultProvider() (no env default).
  */
-export function getStoryProvider(kind?: ProviderKind): StoryProvider {
+export function getStoryProvider(kind?: ProviderKind) {
   const chosen = kind ?? resolveDefaultProvider();
   return getProvider(chosen);
 }

@@ -1,6 +1,6 @@
 // lib/ai/provider-anthropic.ts
 import Anthropic from "@anthropic-ai/sdk";
-import type { StoryProvider, Photo } from "./providers";
+import type { StoryProvider, Photo, Quality } from "./providers";
 import {
   safeJson,
   validateBeats,
@@ -9,13 +9,11 @@ import {
   type Beat,
   type Panel,
 } from "./structured";
-import { getCfg } from "./config";
+import { getCfg, getModelForQuality } from "./config";
 import { enforcePhotoCoverage } from "./panels";
 import { parseTitleNarrative } from "./text";
 
 /* ---------------------------------- utils ---------------------------------- */
-
-// Build Anthropic content with image URLs (no media_type on URL sources)
 function makeAnthropicUserContent(
   text: string,
   imageUrls: string[]
@@ -29,14 +27,12 @@ function makeAnthropicUserContent(
   return content;
 }
 
-// Word clamp by word count (nicer for comics)
 function clampWords(s = "", maxWords = 10) {
   const parts = s.trim().split(/\s+/);
   if (parts.length <= maxWords) return s.trim();
   return parts.slice(0, maxWords).join(" ").replace(/[.,;:!?-]*$/, "…");
 }
 
-// Extra safety pass to enforce comic caps after zod validation
 function enforceComicCaps(panels: Panel[]): Panel[] {
   return panels.map((p) => {
     const narration = p.narration
@@ -52,21 +48,17 @@ function enforceComicCaps(panels: Panel[]): Panel[] {
   });
 }
 
-/* --------------------------------- config ---------------------------------- */
-
 const CFG = getCfg("anthropic");
-const MODEL = CFG.MODEL || "claude-3-5-sonnet-latest";
-
-/* -------------------------------- provider --------------------------------- */
+const DEFAULT_MODEL = CFG.MODEL || "claude-3-5-sonnet-latest";
 
 export class AnthropicProvider implements StoryProvider {
   private client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-  providerName() {
-    return "anthropic";
-  }
-  modelName() {
-    return MODEL;
+  providerName() { return "anthropic"; }
+  modelName() { return DEFAULT_MODEL; }
+
+  private model(quality?: Quality) {
+    return getModelForQuality("anthropic", quality);
   }
 
   async genBeats({
@@ -74,11 +66,13 @@ export class AnthropicProvider implements StoryProvider {
     audience = "kids-10-12",
     tone = "wholesome",
     style = "funny",
+    quality,
   }: {
     photos: Photo[];
     audience?: string;
     tone?: string;
     style?: string;
+    quality?: Quality;
   }): Promise<Beat[]> {
     const system =
       "You are a storyboard editor for a humorous comic. Keep beats short and visual. Return strict JSON.";
@@ -111,9 +105,7 @@ export class AnthropicProvider implements StoryProvider {
       }`,
       "",
       "Use these short factual captions to stay accurate (do not invent):",
-      photos
-        .map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`)
-        .join("\n"),
+      photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
     ].join("\n");
 
     const content: Anthropic.Messages.ContentBlockParam[] = CFG.VISION_BEATS
@@ -121,7 +113,7 @@ export class AnthropicProvider implements StoryProvider {
       : [{ type: "text", text: text + "\n\n" + photos.map((p, i) => `- [${i}] ${p.url}`).join("\n") }];
 
     const resp = await this.client.messages.create({
-      model: MODEL,
+      model: this.model(quality),
       system,
       messages: [{ role: "user", content }],
       temperature: CFG.TEMPERATURE,
@@ -138,10 +130,12 @@ export class AnthropicProvider implements StoryProvider {
     beats,
     photos,
     panelCount,
+    quality,
   }: {
     beats: Beat[];
     photos: Photo[];
     panelCount: number;
+    quality?: Quality;
   }): Promise<Panel[]> {
     const system =
       "You are a comic scriptwriter. Convert beats to panels. Return strict JSON.";
@@ -164,9 +158,7 @@ export class AnthropicProvider implements StoryProvider {
       'Return STRICT JSON only: {"panels": Panel[] }',
       "",
       "Use these factual captions to anchor landmarks/signage/objects where visible:",
-      photos
-        .map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`)
-        .join("\n"),
+      photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
       "",
       "Example panel JSON:",
       `{
@@ -193,7 +185,7 @@ export class AnthropicProvider implements StoryProvider {
       : [{ type: "text", text }];
 
     const resp = await this.client.messages.create({
-      model: MODEL,
+      model: this.model(quality),
       system,
       messages: [{ role: "user", content }],
       temperature: CFG.TEMPERATURE,
@@ -204,23 +196,16 @@ export class AnthropicProvider implements StoryProvider {
       resp.content?.[0]?.type === "text" ? resp.content[0].text ?? "{}" : "{}";
     const json = safeJson<{ panels: unknown }>(raw);
 
-    // zod-validate + normalize (strings→objects, caps from structured.ts)
     const panelsValidated = validatePanels(json.panels);
-
-    // ensure each photo used at least once before reuse
     const panelsCovered = enforcePhotoCoverage(panelsValidated, photos);
-
-    // final safety: clamp by word counts (not just char caps) for comic feel
     const capped = enforceComicCaps(panelsCovered);
 
-    // Ensure valid photoId; fallback by index if missing
     const validIds = new Set(photos.map((p) => p.id));
     return capped.map((p, i) => ({
       ...p,
-      photoId:
-        p.photoId && validIds.has(p.photoId)
-          ? p.photoId
-          : photos[i % photos.length].id,
+      photoId: p.photoId && validIds.has(p.photoId)
+        ? p.photoId
+        : photos[i % photos.length].id,
     }));
   }
 
@@ -229,13 +214,15 @@ export class AnthropicProvider implements StoryProvider {
     audience = "kids-10-12",
     tone = "wholesome",
     style = "funny",
-    wordCount = 90, // short blurb (2–3 lines), comic-style
+    wordCount = 90,
+    quality,
   }: {
     beats: Beat[];
     audience?: string;
     tone?: string;
     style?: string;
     wordCount?: number;
+    quality?: Quality;
   }): Promise<{ title: string; narrative: string }> {
     const system = "You write tiny punchy blurbs for comics.";
     const userText = [
@@ -252,7 +239,7 @@ export class AnthropicProvider implements StoryProvider {
     ].join("\n");
 
     const resp = await this.client.messages.create({
-      model: MODEL,
+      model: this.model(quality),
       system,
       messages: [{ role: "user", content: [{ type: "text", text: userText } as const] }],
       temperature: CFG.TEMPERATURE,

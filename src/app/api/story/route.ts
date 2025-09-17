@@ -8,6 +8,7 @@ import {
   type ProviderKind,
 } from "@/lib/ai/providers";
 import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
+import { getModelForQuality } from "@/lib/ai/config"; // NEW: to record resolved model
 
 /** Keep Node runtime */
 export const runtime = "nodejs";
@@ -24,6 +25,9 @@ const Body = z.object({
 
   // comic preset
   comicAudience: z.enum(["kids", "adults"]).default("kids"),
+
+  // NEW: quality preset (maps to concrete model on server)
+  quality: z.enum(["fast", "balanced", "premium"]).default("balanced"),
 
   // provider choice (optional; server resolves default from available API keys)
   provider: z.enum(["openai", "anthropic", "mock"]).optional(),
@@ -101,103 +105,70 @@ export async function POST(req: Request) {
     storyId = created.id;
 
     // 5) Decide provider (user-selected or resolved by available keys)
-    const chosen: ProviderKind =
-      (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
+    const chosen: ProviderKind = (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
     const provider = getStoryProvider(chosen);
 
     // 6) Panel count heuristic: 4–6 (comic-y), clamped by photos
-    const panelCount =
-      input.panelCount ?? Math.min(6, Math.max(4, photos.length));
+    const panelCount = input.panelCount ?? Math.min(6, Math.max(4, photos.length));
 
     // 7) Prepare photo args (+ captions if available)
-    let photoArgs = photos.map((p) => ({
-      id: p.id,
-      url: p.storageUrl as string,
-      caption: undefined as string | undefined,
-    }));
+    let photoArgs = photos.map((p) => ({ id: p.id, url: p.storageUrl as string, caption: undefined as string | undefined }));
 
-    // Caption pass (batched best-effort; failure is non-fatal)
+    // Caption pass (best-effort)
     try {
-      const caps = await captionPhotosOpenAI(
-        photos.map((p) => ({ id: p.id, url: p.storageUrl }))
-      );
+      const caps = await captionPhotosOpenAI(photos.map((p) => ({ id: p.id, url: p.storageUrl })));
       const byId = new Map(caps.map((c) => [c.id, c]));
       photoArgs = photoArgs.map((p) => {
         const hit = byId.get(p.id);
         return hit?.caption ? { ...p, caption: hit.caption } : p;
       });
-
-      // Persist new captions (best-effort)
       await prisma.$transaction(
-        caps
-          .filter((c) => c.caption)
-          .map((c) =>
-            prisma.photo.update({
-              where: { id: c.id },
-              data: { caption: c.caption },
-            })
-          )
+        caps.filter((c) => c.caption).map((c) => prisma.photo.update({ where: { id: c.id }, data: { caption: c.caption } }))
       );
     } catch (e) {
-      console.warn(
-        "[captions] skipping due to error:",
-        (e as Error)?.message || e
-      );
+      console.warn("[captions] skipping due to error:", (e as Error)?.message || e);
     }
 
     // 8) Generate (with timeouts)
-    const { beats, panels, title, narrative, modelName } = await withTimeout(
+    const { beats, panels, title, narrative } = await withTimeout(
       (async () => {
-        // Beats
         const beats = await provider.genBeats({
           photos: photoArgs,
-          audience:
-            input.audience ??
-            (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
+          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
           style: input.style ?? "funny",
-          tone:
-            input.tone ??
-            (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
           comicAudience: input.comicAudience,
+          quality: input.quality, // NEW
         } as any);
 
-        // Panels
         const panels = await provider.genPanels({
           beats,
           photos: photoArgs,
           panelCount,
           comicAudience: input.comicAudience,
+          quality: input.quality, // NEW
         } as any);
 
-        // Narrative (very short blurb for comic vibe)
         const tn = await provider.genNarrative({
           beats,
-          audience:
-            input.audience ??
-            (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
+          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
           style: input.style ?? "funny",
-          tone:
-            input.tone ??
-            (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
           wordCount: 90,
           comicAudience: input.comicAudience,
+          quality: input.quality, // NEW
         } as any);
 
-        const modelName =
-          typeof (provider as any).modelName === "function"
-            ? (provider as any).modelName()
-            : undefined;
-
         const title = (tn as any)?.title ?? "Untitled Comic";
-        const narrative =
-          (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
-
-        return { beats, panels, title, narrative, modelName };
+        const narrative = (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
+        return { beats, panels, title, narrative };
       })(),
       45_000
     );
 
-    // 9) Persist READY
+    // 9) Persist READY — also record the concrete model resolved for the chosen preset
+    const resolvedModel = getModelForQuality(chosen, input.quality);
+
     await prisma.story.update({
       where: { id: storyId },
       data: {
@@ -206,14 +177,16 @@ export async function POST(req: Request) {
         beatsJson: beats as any,
         panelMap: panels as any,
         status: "READY",
-        model: modelName,
+        model: resolvedModel,
         prompt: JSON.stringify({
           provider: chosen,
+          quality: input.quality,
           comicAudience: input.comicAudience,
           audience: input.audience,
           tone: input.tone,
           style: input.style,
           panelCount,
+          startedAt: started,
         }).slice(0, 2000),
         error: null,
       },

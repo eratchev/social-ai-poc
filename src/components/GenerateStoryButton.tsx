@@ -1,19 +1,22 @@
+// app/components/GenerateStoryButton.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Provider = 'openai' | 'anthropic' | 'mock' | undefined;
+// NEW: quality preset wired end-to-end
+export type Quality = 'fast' | 'balanced' | 'premium';
 
 type Props = {
   roomCode: string;
   ownerHandle?: string;
   className?: string;
-  // remove label prop to avoid SSR/client mismatch
-  provider?: Provider;
+  provider?: Provider;             // optional vendor override
   comicAudience?: 'kids' | 'adults';
   style?: string;
   tone?: string;
+  quality?: Quality;               // NEW: optional quality preset
 };
 
 export default function GenerateStoryButton({
@@ -24,6 +27,7 @@ export default function GenerateStoryButton({
   comicAudience,
   style,
   tone,
+  quality = 'balanced',           // sane default
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -32,7 +36,6 @@ export default function GenerateStoryButton({
 
   useEffect(() => setMounted(true), []);
 
-  // Only decide fancy label after mount; keep SSR text generic
   const clientLabel = `Generate ${comicAudience === 'adults' ? 'Adult' : 'Kids'} Comic`;
   const label = mounted ? clientLabel : 'Generate Story';
 
@@ -47,10 +50,11 @@ export default function GenerateStoryButton({
         body: JSON.stringify({
           roomCode,
           ownerHandle,
-          provider,        // undefined => server uses env default
+          provider,        // undefined => server resolves
           comicAudience,   // 'kids' | 'adults'
           style,
           tone,
+          quality,         // <-- NEW: forward preset
         }),
       });
       const createJson = await createRes.json();

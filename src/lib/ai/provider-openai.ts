@@ -1,26 +1,23 @@
 // lib/ai/provider-openai.ts
 import OpenAI from "openai";
-import type { StoryProvider, Photo } from "./providers";
+import type { StoryProvider, Photo, Quality } from "./providers";
 import {
   safeJson,
   validateBeats,
   validatePanels,
   type Beat,
   type Panel,
-  COMIC_LIMITS, // ✅ use the caps from structured.ts
+  COMIC_LIMITS,
 } from "./structured";
-import { getCfg } from "./config";
+import { getCfg, getModelForQuality } from "./config";
 import { enforcePhotoCoverage } from "./panels";
 import { parseTitleNarrative } from "./text";
-
-// ✅ Import the correct types from the SDK:
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
 } from "openai/resources/chat/completions";
 
 /* ---------------------------------- utils ---------------------------------- */
-
 function makeUserContentWithImages(
   text: string,
   imageUrls: string[]
@@ -32,42 +29,38 @@ function makeUserContentWithImages(
   return content;
 }
 
-// Word clamp by word count, not characters — nicer for comics
 function clampWords(s = "", maxWords = 10) {
   const parts = s.trim().split(/\s+/);
   if (parts.length <= maxWords) return s.trim();
   return parts.slice(0, maxWords).join(" ").replace(/[.,;:!?-]*$/, "…");
 }
 
-// Extra safety pass to enforce comic caps after zod validation
 function enforceComicCaps(panels: Panel[]): Panel[] {
   return panels.map((p) => {
     const narration = p.narration
-      ? clampWords(p.narration, Math.min(12, COMIC_LIMITS.narrationMax)) // ~words, not chars
+      ? clampWords(p.narration, Math.min(12, COMIC_LIMITS.narrationMax))
       : p.narration;
     const bubbles = (p.bubbles ?? [])
       .slice(0, COMIC_LIMITS.bubblesPerPanel)
       .map((b) => ({
         ...b,
-        text: clampWords(b.text, Math.min(10, COMIC_LIMITS.bubbleTextMax)), // ~words
+        text: clampWords(b.text, Math.min(10, COMIC_LIMITS.bubbleTextMax)),
       }));
     return { ...p, narration, bubbles };
   });
 }
 
 const CFG = getCfg("openai");
-const MODEL = CFG.MODEL || "gpt-4o-mini";
-
-/* --------------------------------- provider -------------------------------- */
+const DEFAULT_MODEL = CFG.MODEL || "gpt-4o-mini";
 
 export class OpenAIProvider implements StoryProvider {
   private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-  providerName() {
-    return "openai";
-  }
-  modelName() {
-    return MODEL;
+  providerName() { return "openai"; }
+  modelName() { return DEFAULT_MODEL; }
+
+  private model(quality?: Quality) {
+    return getModelForQuality("openai", quality);
   }
 
   async genBeats({
@@ -75,11 +68,13 @@ export class OpenAIProvider implements StoryProvider {
     audience = "kids-10-12",
     tone = "wholesome",
     style = "funny",
+    quality,
   }: {
     photos: Photo[];
     audience?: string;
     tone?: string;
     style?: string;
+    quality?: Quality;
   }): Promise<Beat[]> {
     const system =
       "You are a storyboard editor for a humorous comic. Keep beats short and visual. Return strict JSON.";
@@ -145,7 +140,7 @@ export class OpenAIProvider implements StoryProvider {
         ];
 
     const resp = await this.client.chat.completions.create({
-      model: MODEL,
+      model: this.model(quality),
       messages,
       temperature: CFG.TEMPERATURE,
       max_tokens: CFG.MAX_TOKENS,
@@ -160,10 +155,12 @@ export class OpenAIProvider implements StoryProvider {
     beats,
     photos,
     panelCount,
+    quality,
   }: {
     beats: Beat[];
     photos: Photo[];
     panelCount: number;
+    quality?: Quality;
   }): Promise<Panel[]> {
     const system =
       "You are a comic scriptwriter. Convert beats to panels. Return strict JSON.";
@@ -187,7 +184,7 @@ export class OpenAIProvider implements StoryProvider {
       "",
       "Use these factual captions to anchor landmarks/signage/objects where visible:",
       photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
-      "",      
+      "",
       "Example panel JSON:",
       `{
         "panels": [
@@ -225,7 +222,7 @@ export class OpenAIProvider implements StoryProvider {
         ];
 
     const resp = await this.client.chat.completions.create({
-      model: MODEL,
+      model: this.model(quality),
       messages,
       temperature: CFG.TEMPERATURE,
       max_tokens: CFG.MAX_TOKENS,
@@ -234,23 +231,16 @@ export class OpenAIProvider implements StoryProvider {
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
     const json = safeJson<{ panels: unknown }>(raw);
 
-    // zod-validate + normalize (strings→objects, caps from structured.ts)
     const panelsValidated = validatePanels(json.panels);
-
-    // ensure each photo used at least once before reuse
     const panelsCovered = enforcePhotoCoverage(panelsValidated, photos);
-
-    // final safety: clamp by word counts (not just char caps) for comic feel
     const panels = enforceComicCaps(panelsCovered);
 
-    // Ensure valid photoId; fallback by index if missing
     const validIds = new Set(photos.map((p) => p.id));
     return panels.map((p, i) => ({
       ...p,
-      photoId:
-        p.photoId && validIds.has(p.photoId)
-          ? p.photoId
-          : photos[i % photos.length].id,
+      photoId: p.photoId && validIds.has(p.photoId)
+        ? p.photoId
+        : photos[i % photos.length].id,
     }));
   }
 
@@ -259,13 +249,15 @@ export class OpenAIProvider implements StoryProvider {
     audience = "kids-10-12",
     tone = "wholesome",
     style = "funny",
-    wordCount = 90, // ✅ shorter blurb by default (2–3 lines)
+    wordCount = 90,
+    quality,
   }: {
     beats: Beat[];
     audience?: string;
     tone?: string;
     style?: string;
     wordCount?: number;
+    quality?: Quality;
   }): Promise<{ title: string; narrative: string }> {
     const system = "You write tiny punchy blurbs for comics.";
 
@@ -288,7 +280,7 @@ export class OpenAIProvider implements StoryProvider {
     ];
 
     const resp = await this.client.chat.completions.create({
-      model: MODEL,
+      model: this.model(quality),
       messages,
       temperature: CFG.TEMPERATURE,
       max_tokens: CFG.MAX_TOKENS,
