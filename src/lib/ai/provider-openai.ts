@@ -111,6 +111,9 @@ export class OpenAIProvider implements StoryProvider {
       }`,
       "",
       "The following images are attached in order. Use them to ground visual details.",
+      "",
+      "Use these short factual captions to stay accurate (do not invent):",
+      photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
     ].join("\n");
 
     const messages: ChatCompletionMessageParam[] = AI_CFG.VISION_BEATS
@@ -181,6 +184,9 @@ export class OpenAIProvider implements StoryProvider {
       "",
       'Return STRICT JSON only: {"panels": Panel[] }',
       "",
+      "Use these factual captions to anchor landmarks/signage/objects where visible:",
+      photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
+      "",      
       "Example panel JSON:",
       `{
         "panels": [

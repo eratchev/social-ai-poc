@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { getProvider } from "@/lib/ai/providers"; // factory returning openai|anthropic|mock
 import type { ProviderKind } from "@/lib/ai/providers";
+import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
 
 /** Keep Node runtime */
 export const runtime = "nodejs";
@@ -101,7 +102,26 @@ export async function POST(req: Request) {
     const provider = getProvider(input.provider);
     const panelCount = input.panelCount ?? Math.min(6, Math.max(photos.length, 4)); // 4–6 is comic-y
 
-    const photoArgs = photos.map((p) => ({ id: p.id, url: p.storageUrl }));
+    // Base
+    let photoArgs = photos.map((p) => ({ id: p.id, url: p.storageUrl as string, caption: undefined as string | undefined }));
+
+    // Caption pass (batched)
+    try {
+      const caps = await captionPhotosOpenAI(photos.map(p => ({ id: p.id, url: p.storageUrl })));
+      const byId = new Map(caps.map(c => [c.id, c]));
+      photoArgs = photoArgs.map(p => {
+        const hit = byId.get(p.id);
+        return hit ? { ...p, caption: hit.caption } : p;
+      });
+
+      await prisma.$transaction(
+        caps.filter(c => c.caption).map(c =>
+          prisma.photo.update({ where: { id: c.id }, data: { caption: c.caption } })
+        )
+      );
+    } catch (e) {
+      console.warn("[captions] skipping due to error:", (e as Error)?.message);
+    }
 
     console.log(
       `[story ${storyId}] generate start; photos=${photos.length}; provider=${input.provider}; panels=${panelCount}`

@@ -52,6 +52,7 @@ model Photo {
   width    Int?
   height   Int?
   bytes    Int?
+  caption  String?
   format   String?
   folder   String?
 

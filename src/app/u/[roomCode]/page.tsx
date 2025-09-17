@@ -19,22 +19,33 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
 
   const room = await prisma.room.findUnique({
     where: { code },
-    select: {
-      id: true,
-      code: true,
+    include: {
       photos: {
-        select: { id: true, storageUrl: true, publicId: true, width: true, height: true },
+        select: {
+          id: true,
+          storageUrl: true,
+          publicId: true,
+          width: true,
+          height: true,
+          caption: true,
+        },
         orderBy: { createdAt: 'desc' },
         take: 60,
-      },
-      stories: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, title: true, shareSlug: true, status: true, createdAt: true },
-      },
+        },
+        stories: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            shareSlug: true,
+            status: true,
+            createdAt: true,
+          },
+        },
     },
   });
-
+  
   if (!room) {
     return (
       <div className="card p-8">
@@ -51,9 +62,13 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
   const initialGallery = room.photos.map((p) => ({
     id: p.id,
     url: p.storageUrl,
+    // we don't pass caption into UploadClient right now—kept simple
   }));
 
-  const renderImg = (p: { storageUrl: string; width: number | null; height: number | null }, priority = false) => {
+  const renderImg = (
+    p: { storageUrl: string; width: number | null; height: number | null },
+    priority = false
+  ) => {
     const w = p.width && p.width > 0 ? p.width : 1200;
     const h = p.height && p.height > 0 ? p.height : 900;
     return (
@@ -77,7 +92,7 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
           <h1 className="text-3xl font-bold tracking-tight">
             Room <span className="font-mono">{room.code}</span>
           </h1>
-          <p className="muted">{initialGallery.length} photo(s)</p>
+          <p className="muted">{room.photos.length} photo(s)</p>
           <div className="mt-2 flex gap-2">
             <HomeLink />
             <Link href={`/u/${room.code}`} className="btn btn-outline">↻ Refresh</Link>
@@ -116,11 +131,13 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
         )}
       </section>
 
-      {/* Masonry Gallery */}
+      {/* Masonry Gallery with captions */}
       <section className="card p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold">Gallery</h2>
-          <span className="muted">{room.photos.length} item{room.photos.length === 1 ? '' : 's'}</span>
+          <span className="muted">
+            {room.photos.length} item{room.photos.length === 1 ? '' : 's'}
+          </span>
         </div>
 
         {room.photos.length === 0 ? (
@@ -136,6 +153,22 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
                 <a href={p.storageUrl} target="_blank" rel="noreferrer" className="block">
                   {renderImg(p, i < 3)}
                 </a>
+                {/* Caption (if available) */}
+                {/*
+                  If your Photo model doesn't have `caption`, this will simply not render any text.
+                  To add captions permanently, add `caption String?` to the Photo model and fill it during captioning step.
+                */}
+                {((p as any).caption)?.length ? (
+                  <div className="border-t px-3 py-2 bg-gray-50 dark:bg-zinc-900">
+                    <p
+                      className="text-xs text-gray-700 dark:text-zinc-300 truncate"
+                      title={(p as any).caption}
+                      aria-label="Photo caption"
+                    >
+                      {(p as any).caption}
+                    </p>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
