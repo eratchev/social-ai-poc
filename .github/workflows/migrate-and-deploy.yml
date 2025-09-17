@@ -1,0 +1,47 @@
+name: Migrate DB and Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (with lockfile)
+        run: |
+          corepack enable
+          pnpm i --frozen-lockfile || npm ci
+
+      # Optional but nice: validate the Prisma schema
+      - name: Prisma validate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: npx prisma validate
+
+      # Apply migrations to Supabase (prod)
+      - name: Prisma migrate deploy (prod)
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: npx prisma migrate deploy --schema prisma/schema.prisma
+
+      # (Optional) Generate client to catch schema/client drift early
+      - name: Prisma generate
+        run: npx prisma generate
+
+      # Hit Vercel Deploy Hook only if migrations succeed
+      - name: Trigger Vercel deploy hook
+        run: curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
+        
