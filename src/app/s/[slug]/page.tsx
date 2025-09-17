@@ -6,6 +6,7 @@ import { blurDataURL } from '@/lib/blur';
 import RegenerateButton from '@/components/RegenerateButton';
 import ShareLinkButton from '@/components/ShareLinkButton';
 import Link from 'next/link';
+import StoryMetaCard from '@/components/StoryMetaCard'; // ✅ shows resolved model + settings
 
 export const runtime = 'nodejs';
 
@@ -178,7 +179,6 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
             </ol>
           </aside>
         )}
-
       </section>
 
       {/* Panels — masonry using CSS columns */}
@@ -236,6 +236,9 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
           </ul>
         </section>
       )}
+
+      {/* ✅ Moved to the very bottom: resolved model + all generation settings */}
+      <StoryMetaCard shareSlug={slug} />
     </main>
   );
 }

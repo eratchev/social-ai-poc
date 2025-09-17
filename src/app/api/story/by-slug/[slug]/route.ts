@@ -32,6 +32,15 @@ export async function GET(req: Request) {
       });
     }
 
+    // Parse generation settings that were saved in story.prompt
+    // (We stored provider, quality, audience/tone/style, panelCount, etc.)
+    let settings: any = undefined;
+    try {
+      settings = story.prompt ? JSON.parse(story.prompt) : undefined;
+    } catch {
+      // non-fatal; leave settings undefined if parsing fails
+    }
+
     return new Response(
       JSON.stringify({
         id: story.id,
@@ -41,6 +50,9 @@ export async function GET(req: Request) {
         beats: story.beatsJson,
         panels: story.panelMap,
         createdAt: story.createdAt,
+        // NEW fields:
+        model: story.model ?? null,  // resolved concrete model id used
+        settings,                    // provider/quality/comicAudience/audience/tone/style/panelCount/…
       }),
       { headers: { 'content-type': 'application/json' } }
     );

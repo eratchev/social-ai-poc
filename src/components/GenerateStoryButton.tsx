@@ -5,18 +5,17 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Provider = 'openai' | 'anthropic' | 'mock' | undefined;
-// NEW: quality preset wired end-to-end
 export type Quality = 'fast' | 'balanced' | 'premium';
 
 type Props = {
   roomCode: string;
   ownerHandle?: string;
   className?: string;
-  provider?: Provider;             // optional vendor override
+  provider?: Provider;
   comicAudience?: 'kids' | 'adults';
   style?: string;
   tone?: string;
-  quality?: Quality;               // NEW: optional quality preset
+  quality?: Quality;
 };
 
 export default function GenerateStoryButton({
@@ -27,10 +26,10 @@ export default function GenerateStoryButton({
   comicAudience,
   style,
   tone,
-  quality = 'balanced',           // sane default
+  quality = 'balanced',
 }: Props) {
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,   setErr] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -50,11 +49,11 @@ export default function GenerateStoryButton({
         body: JSON.stringify({
           roomCode,
           ownerHandle,
-          provider,        // undefined => server resolves
+          provider,        // undefined => server resolves default
           comicAudience,   // 'kids' | 'adults'
           style,
           tone,
-          quality,         // <-- NEW: forward preset
+          quality,         // forwarded to server, maps to a concrete model
         }),
       });
       const createJson = await createRes.json();
@@ -64,6 +63,16 @@ export default function GenerateStoryButton({
       const shareRes = await fetch(`/api/story/${id}/share`, { method: 'POST' });
       const shareJson = await shareRes.json();
       if (!shareRes.ok) throw new Error(shareJson.error || 'Failed sharing story');
+
+      // ✅ Stash meta using a key that mirrors the by-slug API path
+      try {
+        const key = `story-meta:/api/story/by-slug/${shareJson.shareSlug}`;
+        const meta = {
+          model: createJson.model,      // resolved concrete model id
+          settings: createJson.settings // provider/quality/audience/tone/style/panelCount
+        };
+        sessionStorage.setItem(key, JSON.stringify(meta));
+      } catch {}
 
       router.push(`/s/${shareJson.shareSlug}`);
     } catch (e: any) {

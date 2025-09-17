@@ -1,4 +1,4 @@
-// app/api/story/route.ts
+// src/app/api/story/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
@@ -8,9 +8,8 @@ import {
   type ProviderKind,
 } from "@/lib/ai/providers";
 import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
-import { getModelForQuality } from "@/lib/ai/config"; // NEW: to record resolved model
+import { getModelForQuality } from "@/lib/ai/config";
 
-/** Keep Node runtime */
 export const runtime = "nodejs";
 
 /** Request body schema */
@@ -26,7 +25,7 @@ const Body = z.object({
   // comic preset
   comicAudience: z.enum(["kids", "adults"]).default("kids"),
 
-  // NEW: quality preset (maps to concrete model on server)
+  // NEW: quality preset
   quality: z.enum(["fast", "balanced", "premium"]).default("balanced"),
 
   // provider choice (optional; server resolves default from available API keys)
@@ -105,62 +104,95 @@ export async function POST(req: Request) {
     storyId = created.id;
 
     // 5) Decide provider (user-selected or resolved by available keys)
-    const chosen: ProviderKind = (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
+    const chosen: ProviderKind =
+      (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
     const provider = getStoryProvider(chosen);
 
     // 6) Panel count heuristic: 4–6 (comic-y), clamped by photos
-    const panelCount = input.panelCount ?? Math.min(6, Math.max(4, photos.length));
+    const panelCount =
+      input.panelCount ?? Math.min(6, Math.max(4, photos.length));
 
     // 7) Prepare photo args (+ captions if available)
-    let photoArgs = photos.map((p) => ({ id: p.id, url: p.storageUrl as string, caption: undefined as string | undefined }));
+    let photoArgs = photos.map((p) => ({
+      id: p.id,
+      url: p.storageUrl as string,
+      caption: undefined as string | undefined,
+    }));
 
-    // Caption pass (best-effort)
+    // Caption pass (batched best-effort; failure is non-fatal)
     try {
-      const caps = await captionPhotosOpenAI(photos.map((p) => ({ id: p.id, url: p.storageUrl })));
+      const caps = await captionPhotosOpenAI(
+        photos.map((p) => ({ id: p.id, url: p.storageUrl }))
+      );
       const byId = new Map(caps.map((c) => [c.id, c]));
       photoArgs = photoArgs.map((p) => {
         const hit = byId.get(p.id);
         return hit?.caption ? { ...p, caption: hit.caption } : p;
       });
+
+      // Persist new captions (best-effort)
       await prisma.$transaction(
-        caps.filter((c) => c.caption).map((c) => prisma.photo.update({ where: { id: c.id }, data: { caption: c.caption } }))
+        caps
+          .filter((c) => c.caption)
+          .map((c) =>
+            prisma.photo.update({
+              where: { id: c.id },
+              data: { caption: c.caption },
+            })
+          )
       );
     } catch (e) {
-      console.warn("[captions] skipping due to error:", (e as Error)?.message || e);
+      console.warn(
+        "[captions] skipping due to error:",
+        (e as Error)?.message || e
+      );
     }
+
+    // Common knobs derived from presets
+    const promptAudience =
+      input.audience ??
+      (input.comicAudience === "kids" ? "kids-10-12" : "adults");
+    const promptStyle = input.style ?? "funny";
+    const promptTone =
+      input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty");
 
     // 8) Generate (with timeouts)
     const { beats, panels, title, narrative } = await withTimeout(
       (async () => {
+        // Beats
         const beats = await provider.genBeats({
           photos: photoArgs,
-          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
-          style: input.style ?? "funny",
-          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          audience: promptAudience,
+          style: promptStyle,
+          tone: promptTone,
           comicAudience: input.comicAudience,
-          quality: input.quality, // NEW
+          quality: input.quality,
         } as any);
 
+        // Panels
         const panels = await provider.genPanels({
           beats,
           photos: photoArgs,
           panelCount,
           comicAudience: input.comicAudience,
-          quality: input.quality, // NEW
+          quality: input.quality,
         } as any);
 
+        // Narrative (very short blurb for comic vibe)
         const tn = await provider.genNarrative({
           beats,
-          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
-          style: input.style ?? "funny",
-          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          audience: promptAudience,
+          style: promptStyle,
+          tone: promptTone,
           wordCount: 90,
           comicAudience: input.comicAudience,
-          quality: input.quality, // NEW
+          quality: input.quality,
         } as any);
 
         const title = (tn as any)?.title ?? "Untitled Comic";
-        const narrative = (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
+        const narrative =
+          (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
+
         return { beats, panels, title, narrative };
       })(),
       45_000
@@ -192,7 +224,20 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ id: storyId, status: "READY" });
+    return NextResponse.json({
+      id: storyId,
+      status: "READY",
+      model: resolvedModel,
+      settings: {
+        provider: chosen,
+        quality: input.quality,
+        comicAudience: input.comicAudience,
+        audience: input.audience ?? promptAudience,
+        tone: input.tone ?? promptTone,
+        style: input.style ?? promptStyle,
+        panelCount,
+      },
+    });
   } catch (err: any) {
     console.error("POST /api/story error", err?.message || err);
     if (storyId) {
