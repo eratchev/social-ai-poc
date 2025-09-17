@@ -39,7 +39,17 @@ export interface StoryProvider {
 export type ProviderKind = "openai" | "anthropic" | "mock";
 
 /**
- * Factory: explicit provider
+ * Resolve a sane default based on available server credentials.
+ * Priority: OpenAI → Anthropic → Mock
+ */
+export function resolveDefaultProvider(): ProviderKind {
+  if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  return "mock";
+}
+
+/**
+ * Explicit factory: construct a provider by kind.
  */
 export function getProvider(kind: ProviderKind): StoryProvider {
   if (kind === "openai") {
@@ -55,12 +65,11 @@ export function getProvider(kind: ProviderKind): StoryProvider {
 }
 
 /**
- * Back-compat: env-based factory (AI_PROVIDER)
- *  - Keeps existing callers working.
+ * Flexible factory:
+ * - If kind is provided, use it.
+ * - If omitted, fall back to resolveDefaultProvider() (no env default).
  */
-export function getStoryProvider(): StoryProvider {
-  const p = (process.env.AI_PROVIDER || "mock").toLowerCase() as ProviderKind;
-  return getProvider(
-    p === "openai" || p === "anthropic" || p === "mock" ? p : "mock"
-  );
+export function getStoryProvider(kind?: ProviderKind): StoryProvider {
+  const chosen = kind ?? resolveDefaultProvider();
+  return getProvider(chosen);
 }

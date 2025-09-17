@@ -2,8 +2,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { getProvider } from "@/lib/ai/providers"; // factory returning openai|anthropic|mock
-import type { ProviderKind } from "@/lib/ai/providers";
+import {
+  getStoryProvider,
+  resolveDefaultProvider,
+  type ProviderKind,
+} from "@/lib/ai/providers";
 import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
 
 /** Keep Node runtime */
@@ -19,16 +22,14 @@ const Body = z.object({
   style: z.string().optional(),    // e.g. "funny", "witty"
   tone: z.string().optional(),     // e.g. "wholesome", "snarky"
 
-  // comic presets
+  // comic preset
   comicAudience: z.enum(["kids", "adults"]).default("kids"),
 
-  // provider + panel count
-  provider: z.enum(["openai", "anthropic", "mock"]).default(
-    (process.env.AI_PROVIDER as ProviderKind) || "openai"
-  ),
-  panelCount: z.number().int().min(1).max(24).optional(), // default below
+  // provider choice (optional; server resolves default from available API keys)
+  provider: z.enum(["openai", "anthropic", "mock"]).optional(),
 
-  // future: save toggle (we always save in this route)
+  // panel count (for comic feel keep small)
+  panelCount: z.number().int().min(1).max(24).optional(),
 });
 
 /** Simple timeout wrapper */
@@ -58,13 +59,14 @@ export async function POST(req: Request) {
     });
 
     // 2) Ensure Room
+    const code = input.roomCode.toUpperCase();
     let room = await prisma.room.findUnique({
-      where: { code: input.roomCode },
+      where: { code },
       select: { id: true },
     });
     if (!room) {
       room = await prisma.room.create({
-        data: { code: input.roomCode, createdBy: user.id },
+        data: { code, createdBy: user.id },
         select: { id: true },
       });
     }
@@ -98,63 +100,87 @@ export async function POST(req: Request) {
     });
     storyId = created.id;
 
-    // 5) Generate via provider (with timeout)
-    const provider = getProvider(input.provider);
-    const panelCount = input.panelCount ?? Math.min(6, Math.max(photos.length, 4)); // 4–6 is comic-y
+    // 5) Decide provider (user-selected or resolved by available keys)
+    const chosen: ProviderKind =
+      (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
+    const provider = getStoryProvider(chosen);
 
-    // Base
-    let photoArgs = photos.map((p) => ({ id: p.id, url: p.storageUrl as string, caption: undefined as string | undefined }));
+    // 6) Panel count heuristic: 4–6 (comic-y), clamped by photos
+    const panelCount =
+      input.panelCount ?? Math.min(6, Math.max(4, photos.length));
 
-    // Caption pass (batched)
+    // 7) Prepare photo args (+ captions if available)
+    let photoArgs = photos.map((p) => ({
+      id: p.id,
+      url: p.storageUrl as string,
+      caption: undefined as string | undefined,
+    }));
+
+    // Caption pass (batched best-effort; failure is non-fatal)
     try {
-      const caps = await captionPhotosOpenAI(photos.map(p => ({ id: p.id, url: p.storageUrl })));
-      const byId = new Map(caps.map(c => [c.id, c]));
-      photoArgs = photoArgs.map(p => {
+      const caps = await captionPhotosOpenAI(
+        photos.map((p) => ({ id: p.id, url: p.storageUrl }))
+      );
+      const byId = new Map(caps.map((c) => [c.id, c]));
+      photoArgs = photoArgs.map((p) => {
         const hit = byId.get(p.id);
-        return hit ? { ...p, caption: hit.caption } : p;
+        return hit?.caption ? { ...p, caption: hit.caption } : p;
       });
 
+      // Persist new captions (best-effort)
       await prisma.$transaction(
-        caps.filter(c => c.caption).map(c =>
-          prisma.photo.update({ where: { id: c.id }, data: { caption: c.caption } })
-        )
+        caps
+          .filter((c) => c.caption)
+          .map((c) =>
+            prisma.photo.update({
+              where: { id: c.id },
+              data: { caption: c.caption },
+            })
+          )
       );
     } catch (e) {
-      console.warn("[captions] skipping due to error:", (e as Error)?.message);
+      console.warn(
+        "[captions] skipping due to error:",
+        (e as Error)?.message || e
+      );
     }
 
-    console.log(
-      `[story ${storyId}] generate start; photos=${photos.length}; provider=${input.provider}; panels=${panelCount}`
-    );
-
+    // 8) Generate (with timeouts)
     const { beats, panels, title, narrative, modelName } = await withTimeout(
       (async () => {
         // Beats
         const beats = await provider.genBeats({
           photos: photoArgs,
-          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
+          audience:
+            input.audience ??
+            (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
           style: input.style ?? "funny",
-          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
-          // some providers may also accept comicAudience in the signature; harmless if ignored
-          comicAudience: input.comicAudience as any,
+          tone:
+            input.tone ??
+            (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          comicAudience: input.comicAudience,
         } as any);
 
-        // Panels (short, bubble-first)
+        // Panels
         const panels = await provider.genPanels({
           beats,
           photos: photoArgs,
           panelCount,
-          comicAudience: input.comicAudience as any,
+          comicAudience: input.comicAudience,
         } as any);
 
-        // Narrative (very short blurb)
+        // Narrative (very short blurb for comic vibe)
         const tn = await provider.genNarrative({
           beats,
-          audience: input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
+          audience:
+            input.audience ??
+            (input.comicAudience === "kids" ? "kids-10-12" : "adults"),
           style: input.style ?? "funny",
-          tone: input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty"),
+          tone:
+            input.tone ??
+            (input.comicAudience === "kids" ? "wholesome" : "witty"),
           wordCount: 90,
-          comicAudience: input.comicAudience as any,
+          comicAudience: input.comicAudience,
         } as any);
 
         const modelName =
@@ -162,7 +188,6 @@ export async function POST(req: Request) {
             ? (provider as any).modelName()
             : undefined;
 
-        // Support both {title,narrative} and plain string narrative
         const title = (tn as any)?.title ?? "Untitled Comic";
         const narrative =
           (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
@@ -172,9 +197,7 @@ export async function POST(req: Request) {
       45_000
     );
 
-    console.log(`[story ${storyId}] generate done in ${Date.now() - started}ms`);
-
-    // 6) Persist READY
+    // 9) Persist READY
     await prisma.story.update({
       where: { id: storyId },
       data: {
@@ -185,7 +208,7 @@ export async function POST(req: Request) {
         status: "READY",
         model: modelName,
         prompt: JSON.stringify({
-          provider: input.provider,
+          provider: chosen,
           comicAudience: input.comicAudience,
           audience: input.audience,
           tone: input.tone,
@@ -199,7 +222,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ id: storyId, status: "READY" });
   } catch (err: any) {
     console.error("POST /api/story error", err?.message || err);
-    // flip to ERROR if we already created a story row
     if (storyId) {
       try {
         await prisma.story.update({
