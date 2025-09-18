@@ -1,12 +1,12 @@
 // src/app/api/story/[id]/share/route.ts
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { randomBytes } from 'crypto';
 
 export const runtime = 'nodejs';
 
-// Helper: short, URL-safe slug like "aB3-xY9"
-function makeSlug(len = 10) {
-  return crypto.randomBytes(Math.ceil(len * 0.75)).toString('base64url').slice(0, len);
+function makeSlug(length = 21) {
+  const raw = randomBytes(Math.ceil((length * 3) / 4)).toString('base64url');
+  return raw.slice(0, length);
 }
 
 // Extract story id from URL: /api/story/<id>/share
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     // Generate a new slug; retry once if unique constraint clashes (rare)
     for (let i = 0; i < 2; i++) {
-      const candidate = makeSlug(10);
+      const candidate = makeSlug();
       try {
         const story = await prisma.story.update({
           where: { id },
