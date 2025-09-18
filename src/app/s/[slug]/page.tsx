@@ -235,9 +235,9 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
                     </div>
                   ) : null}
 
-                  {p.alt ? (
+                  {/* {p.alt ? (
                     <div className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400 italic">{p.alt}</div>
-                  ) : null}
+                  ) : null} */}
                 </li>
               );
             })}
