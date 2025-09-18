@@ -7,7 +7,7 @@ import { z } from "zod";
 export const COMIC_LIMITS = {
   beatSummaryMax: 120,
   narrationMax: 80,
-  bubbleTextMax: 40,
+  bubbleTextMax: 80,
   bubblesPerPanel: 2,
   maxBeats: 12,
   maxPanels: 24,
