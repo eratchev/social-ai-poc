@@ -37,8 +37,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     where: { shareSlug: slug, status: 'READY' },
     select: { title: true },
   });
-  if (!story) return { title: 'Story not found' };
-  return { title: story.title };
+  
+  const title = story ? story.title : 'Story not found';
+
+  return {
+    title,
+    robots: {
+      index: false,
+      follow: false,
+    },
+  };
 }
 
 // 💬 Dialog bubble chip (dark-mode aware)

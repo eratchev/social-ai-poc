@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 // Let Next infer the context type to satisfy its route type guard
 export async function GET(_req: Request, { params }: any) {
-  const { slug } = params as { slug: string };
+  const { slug } = await params;
 
   const story = await prisma.story.findFirst({
     where: { shareSlug: slug, status: "READY" },

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     if (!slug) {
       return new Response(JSON.stringify({ error: 'bad_request' }), {
         status: 400,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-robots-tag': 'noindex, nofollow' },
       });
     }
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     if (!story) {
       return new Response(JSON.stringify({ error: 'not_found' }), {
         status: 404,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-robots-tag': 'noindex, nofollow' },
       });
     }
 
@@ -54,13 +54,13 @@ export async function GET(req: Request) {
         model: story.model ?? null,  // resolved concrete model id used
         settings,                    // provider/quality/comicAudience/audience/tone/style/panelCount/…
       }),
-      { headers: { 'content-type': 'application/json' } }
+      { headers: { 'content-type': 'application/json', 'x-robots-tag': 'noindex, nofollow' } }
     );
   } catch (err) {
     console.error('GET /api/story/by-slug/[slug] error', err);
     return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-robots-tag': 'noindex, nofollow' },
     });
   }
 }

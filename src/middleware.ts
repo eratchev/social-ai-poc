@@ -9,15 +9,27 @@ const PUBLIC_PATHS = [
   '/sitemap.xml',
 ];
 
+// Prefix-based public routes
+const PUBLIC_PREFIXES = [
+  '/s/',                 // shared story pages
+  '/api/story/by-slug/', // shared story API
+];
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Skip static files and public paths
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/static') ||
-    PUBLIC_PATHS.some((p) => pathname === p)
-  ) {
+  // Skip static files
+  if (pathname.startsWith('/_next') || pathname.startsWith('/static')) {
+    return NextResponse.next();
+  }
+
+  // Skip exact public paths
+  if (PUBLIC_PATHS.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Skip public prefixes
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next();
   }
 
