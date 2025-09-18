@@ -151,7 +151,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <ShareLinkButton />
-          <RegenerateButton roomCode={story.room.code} />
+          {/* <RegenerateButton roomCode={story.room.code} /> */}
         </div>
       </header>
 
