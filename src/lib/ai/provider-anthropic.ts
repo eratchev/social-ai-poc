@@ -49,7 +49,7 @@ function enforceComicCaps(panels: Panel[]): Panel[] {
 }
 
 const CFG = getCfg("anthropic");
-const DEFAULT_MODEL = CFG.MODEL || "claude-3-5-sonnet-latest";
+const DEFAULT_MODEL = CFG.MODEL || "claude-haiku-4-5";
 
 export class AnthropicProvider implements StoryProvider {
   private client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });

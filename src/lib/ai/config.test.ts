@@ -36,7 +36,7 @@ describe('config', () => {
 
     it('should return Anthropic defaults when no env vars set', () => {
       const cfg = getCfg('anthropic');
-      expect(cfg.MODEL).toBe('claude-3-5-sonnet-latest');
+      expect(cfg.MODEL).toBe('claude-haiku-4-5');
       expect(cfg.TEMPERATURE).toBe(0.8);
       expect(cfg.MAX_TOKENS).toBe(1200);
       expect(cfg.VISION_BEATS).toBe(true);
@@ -140,17 +140,17 @@ describe('config', () => {
 
     it('should return Anthropic model for fast quality', () => {
       const model = getModelForQuality('anthropic', 'fast');
-      expect(model).toBe('claude-3-haiku-20240307');
+      expect(model).toBe('claude-haiku-4-5');
     });
 
     it('should return Anthropic model for balanced quality', () => {
       const model = getModelForQuality('anthropic', 'balanced');
-      expect(model).toBe('claude-3-5-sonnet-latest');
+      expect(model).toBe('claude-haiku-4-5');
     });
 
     it('should return Anthropic model for premium quality', () => {
       const model = getModelForQuality('anthropic', 'premium');
-      expect(model).toBe('claude-3-5-sonnet-latest');
+      expect(model).toBe('claude-haiku-4-5');
     });
 
     it('should use env var overrides for Anthropic', () => {

@@ -54,7 +54,7 @@ const OPENAI_DEFAULTS: ProviderConfig = {
 };
 
 const ANTHROPIC_DEFAULTS: ProviderConfig = {
-  MODEL: "claude-3-5-sonnet-latest", // make sure your key sees this id
+  MODEL: "claude-haiku-4-5", // make sure your key sees this id
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
@@ -122,9 +122,9 @@ export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
       premium: process.env.ANTHROPIC_MODEL_PREMIUM,
     };
     const defaults: Record<Quality, string> = {
-      fast: "claude-3-haiku-20240307",             // safe/light default
-      balanced: cfg.MODEL || "claude-3-5-sonnet-latest",
-      premium: cfg.MODEL || "claude-3-5-sonnet-latest", // bump via env when ready
+      fast: "claude-haiku-4-5",            
+      balanced: cfg.MODEL || "claude-sonnet-4-5",
+      premium: cfg.MODEL || "claude-opus-4-5", 
     };
     return envMap[quality] || defaults[quality] || cfg.MODEL;
   }
