@@ -50,7 +50,7 @@ export default function UploadClient({
     if (!incoming.length) return;
     const accepted = incoming.filter(f => f.type.startsWith('image/') && f.size <= MAX_BYTES);
     if (accepted.length) setFiles(prev => [...prev, ...accepted]);
-  }, []);
+  }, [MAX_BYTES]);
 
   const acceptFileList = useCallback((list: FileList | null) => {
     if (!list) return;
@@ -237,11 +237,11 @@ export default function UploadClient({
     await Promise.all(workers);
   }
 
-  const startUpload = useCallback(async () => {
+  const startUpload = async () => {
     if (files.length === 0) return;
     await uploadMany(files, 3);
     setFiles([]);
-  }, [files]);
+  };
 
   // ---------- UI ----------
   const dzBase = 'relative rounded-2xl border-2 p-10 flex flex-col items-center justify-center gap-3 text-center transition';
