@@ -125,7 +125,7 @@ describe('config', () => {
 
     it('should return OpenAI model for premium quality', () => {
       const model = getModelForQuality('openai', 'premium');
-      expect(model).toBe('gpt-4o-mini');
+      expect(model).toBe('gpt-4o');
     });
 
     it('should use env var overrides for OpenAI', () => {
@@ -145,12 +145,12 @@ describe('config', () => {
 
     it('should return Anthropic model for balanced quality', () => {
       const model = getModelForQuality('anthropic', 'balanced');
-      expect(model).toBe('claude-haiku-4-5');
+      expect(model).toBe('claude-sonnet-4-5');
     });
 
     it('should return Anthropic model for premium quality', () => {
       const model = getModelForQuality('anthropic', 'premium');
-      expect(model).toBe('claude-haiku-4-5');
+      expect(model).toBe('claude-opus-4-5');
     });
 
     it('should use env var overrides for Anthropic', () => {

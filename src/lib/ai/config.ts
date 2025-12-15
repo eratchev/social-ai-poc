@@ -98,7 +98,6 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
  *   3) Provider's legacy single MODEL from getCfg(kind)
  */
 export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
-  const cfg = getCfg(kind);
   const quality = q || "balanced";
 
   if (kind === "openai") {
@@ -109,10 +108,10 @@ export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
     };
     const defaults: Record<Quality, string> = {
       fast: "gpt-4o-mini",
-      balanced: cfg.MODEL || "gpt-4o-mini",
-      premium: cfg.MODEL || "gpt-4o", // override in env if you want a pricier tier
+      balanced: "gpt-4o-mini",
+      premium: "gpt-4o",
     };
-    return envMap[quality] || defaults[quality] || cfg.MODEL;
+    return envMap[quality] || defaults[quality];
   }
 
   if (kind === "anthropic") {
@@ -122,12 +121,14 @@ export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
       premium: process.env.ANTHROPIC_MODEL_PREMIUM,
     };
     const defaults: Record<Quality, string> = {
-      fast: "claude-haiku-4-5",            
-      balanced: cfg.MODEL || "claude-sonnet-4-5",
-      premium: cfg.MODEL || "claude-opus-4-5", 
+      fast: "claude-haiku-4-5",
+      balanced: "claude-sonnet-4-5",
+      premium: "claude-opus-4-5",
     };
-    return envMap[quality] || defaults[quality] || cfg.MODEL;
+    return envMap[quality] || defaults[quality];
   }
 
+  // Only call getCfg for mock (or other unknown providers)
+  const cfg = getCfg(kind);
   return cfg.MODEL;
 }
