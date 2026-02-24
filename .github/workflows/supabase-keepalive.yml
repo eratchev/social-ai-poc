@@ -1,0 +1,22 @@
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # Every 3 days at 08:00 UTC (Supabase pauses after 7 days of inactivity)
+    - cron: '0 8 */3 * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  ping:
+    name: Ping health endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health
+        run: |
+          echo "Pinging ${{ vars.APP_URL }}/api/health"
+          response=$(curl --silent --show-error --fail \
+            --max-time 30 \
+            --retry 3 --retry-delay 5 \
+            "${{ vars.APP_URL }}/api/health")
+          echo "Response: $response"
+          echo "$response" | grep -q '"ok":true' || { echo "Health check returned ok:false"; exit 1; }
