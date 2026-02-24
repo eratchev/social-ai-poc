@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/unlock',
   '/api/unlock',
+  '/api/health',
   '/favicon.ico',
   '/robots.txt',
   '/sitemap.xml',
