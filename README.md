@@ -18,8 +18,31 @@ This project is not about UI polish — it is an architectural exploration of:
 
 Photos are grouped into **rooms**. A generation request triggers a three-stage pipeline — beats, panels, narrative — producing a typed, validated story artifact. Stories can be published via a unique slug for public access.
 
-```
-Photos → [Caption Pass] → Beat Generation → Panel Layout → Narrative → Story (READY)
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as POST /api/story
+    participant LLM as LLM Provider
+    participant DB as PostgreSQL
+
+    Client->>API: POST /api/story {roomId, quality}
+    API->>DB: Create Story (PENDING)
+    API->>DB: Set status PROCESSING
+
+    API->>LLM: captionPhotos (optional)
+    LLM-->>API: captions (non-fatal if fails)
+
+    API->>LLM: genBeats(photos, captions)
+    LLM-->>API: Beat[] validated via Zod
+
+    API->>LLM: genPanels(beats)
+    LLM-->>API: Panel[] validated via Zod
+
+    API->>LLM: genNarrative(panels)
+    LLM-->>API: narrative string
+
+    API->>DB: Update Story (beatsJson, panelMap, narrative, READY)
+    API-->>Client: Story
 ```
 
 ---
@@ -54,6 +77,38 @@ Structured output is normalized through `safeJson()` (strips LLM code fences) an
 ### 3. Data Modeling and Persistence
 
 Four core entities: `User`, `Room`, `Photo`, `Story`.
+
+```mermaid
+erDiagram
+    User {
+        string id
+        string email
+    }
+    Room {
+        string id
+        string code
+        string userId
+    }
+    Photo {
+        string id
+        string cloudinaryUrl
+        string caption
+        string roomId
+    }
+    Story {
+        string id
+        string status
+        json beatsJson
+        json panelMap
+        string narrative
+        string shareSlug
+        string roomId
+    }
+
+    User ||--o{ Room : owns
+    Room ||--o{ Photo : contains
+    Room ||--o{ Story : generates
+```
 
 - **Room** — Groups photos under a short, uppercase code. Entry point for all generation.
 - **Photo** — References a Cloudinary asset. Stores optional AI-generated captions.
