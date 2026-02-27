@@ -4,10 +4,9 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-function randomCode(len = 6) {
-  // e.g., "R-7FJ2QK"
-  const base = crypto.randomBytes(len).toString('base64url').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return `R-${base.slice(0, len)}`;
+export function randomCode(len = 6) {
+  // hex encoding produces only 0-9 and a-f — all alphanumeric, no stripping needed.
+  return `R-${crypto.randomBytes(len).toString('hex').toUpperCase().slice(0, len)}`;
 }
 
 export async function POST(req: Request) {

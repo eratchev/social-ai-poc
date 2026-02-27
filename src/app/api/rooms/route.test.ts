@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { POST } from './route';
+import crypto from 'crypto';
+import { POST, randomCode } from './route';
 import { prisma } from '@/lib/prisma';
 
 vi.mock('@/lib/prisma', () => ({
@@ -12,6 +13,21 @@ vi.mock('@/lib/prisma', () => ({
     },
   },
 }));
+
+describe('randomCode', () => {
+  it('always produces a code with exactly 6 alphanumeric chars after R-', () => {
+    for (let i = 0; i < 200; i++) {
+      expect(randomCode()).toMatch(/^R-[A-Z0-9]{6}$/);
+    }
+  });
+
+  it('produces exactly 6 chars even when all random bytes are 0xFF', () => {
+    // 0xFF bytes in hex → 'FFFFFF...' — all valid alphanumeric, no stripping needed
+    vi.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.alloc(6, 0xff));
+    expect(randomCode()).toBe('R-FFFFFF');
+    vi.restoreAllMocks();
+  });
+});
 
 describe('/api/rooms', () => {
   beforeEach(() => {

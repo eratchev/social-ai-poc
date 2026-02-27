@@ -3,8 +3,6 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { safeJson } from "./structured";
 
-const MODEL = process.env.AI_DEFAULT_MODEL || "gpt-4o-mini";
-
 export type PhotoIn = { id: string; url: string };
 export type CaptionOut = { id: string; caption: string; tags: string[] };
 
@@ -20,6 +18,7 @@ const CaptionSchema = z.object({
 
 export async function captionPhotosOpenAI(photos: PhotoIn[]): Promise<CaptionOut[]> {
   if (!photos.length) return [];
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
   const system =
@@ -41,13 +40,13 @@ export async function captionPhotosOpenAI(photos: PhotoIn[]): Promise<CaptionOut
   }
 
   const resp = await client.chat.completions.create({
-    model: MODEL,
+    model,
     messages: [
       { role: "system", content: system },
       { role: "user", content: userParts },
     ],
     temperature: 0.2,
-    max_tokens: 500,
+    max_tokens: Math.max(500, photos.length * 150),
   });
 
   const raw = (resp.choices?.[0]?.message?.content ?? "{}").trim();

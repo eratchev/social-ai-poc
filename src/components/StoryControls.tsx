@@ -148,10 +148,6 @@ export default function StoryControls({ roomCode, ownerHandle }: Props) {
         style={style}
         tone={tone}
         provider={provider}
-        // NOTE: Pass through for newer API. If your current GenerateStoryButton
-        // type doesn't include `quality`, you can either add it there or ignore
-        // TS by uncommenting the next line.
-        // @ts-ignore
         quality={quality}
       />
     </div>

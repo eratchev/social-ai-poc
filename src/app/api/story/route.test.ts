@@ -413,12 +413,12 @@ describe('/api/story', () => {
 
     await POST(request);
 
-    // title falls back to "Untitled Comic", narrative uses the string itself
+    // title falls back to "Untitled Comic", narrative falls back to "" (plain strings have no .narrative)
     expect(prisma.story.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           title: 'Untitled Comic',
-          narrative: 'Plain string narrative',
+          narrative: '',
         }),
       })
     );

@@ -5,9 +5,8 @@ export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
-    // Parse the story id from the URL (/api/story/<id>)
-    const pathname = new URL(req.url).pathname;
-    const id = pathname.split('/').pop();
+    const match = new URL(req.url).pathname.match(/\/api\/story\/([^/]+)$/);
+    const id = match?.[1];
     if (!id) {
       return new Response(JSON.stringify({ error: 'bad_request' }), {
         status: 400,

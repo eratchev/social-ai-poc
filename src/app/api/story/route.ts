@@ -39,9 +39,9 @@ const Body = z.object({
 async function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
   return Promise.race([
     p,
-    new Promise<T>((_, reject) =>
+    new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
-    ) as any,
+    ),
   ]);
 }
 
@@ -167,7 +167,7 @@ export async function POST(req: Request) {
           tone: promptTone,
           comicAudience: input.comicAudience,
           quality: input.quality,
-        } as any);
+        });
 
         // Panels
         const panels = await provider.genPanels({
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
           panelCount,
           comicAudience: input.comicAudience,
           quality: input.quality,
-        } as any);
+        });
 
         // Narrative (very short blurb for comic vibe)
         const tn = await provider.genNarrative({
@@ -187,11 +187,10 @@ export async function POST(req: Request) {
           wordCount: 90,
           comicAudience: input.comicAudience,
           quality: input.quality,
-        } as any);
+        });
 
-        const title = (tn as any)?.title ?? "Untitled Comic";
-        const narrative =
-          (tn as any)?.narrative ?? (typeof tn === "string" ? tn : "");
+        const title = tn?.title || "Untitled Comic";
+        const narrative = tn?.narrative || "";
 
         return { beats, panels, title, narrative };
       })(),
@@ -206,8 +205,8 @@ export async function POST(req: Request) {
       data: {
         title,
         narrative,
-        beatsJson: beats as any,
-        panelMap: panels as any,
+        beatsJson: beats as unknown as object,
+        panelMap: panels as unknown as object,
         status: "READY",
         model: resolvedModel,
         prompt: JSON.stringify({
@@ -219,7 +218,7 @@ export async function POST(req: Request) {
           style: input.style,
           panelCount,
           startedAt: started,
-        }).slice(0, 2000),
+        }),
         error: null,
       },
     });
