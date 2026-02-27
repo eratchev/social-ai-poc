@@ -110,6 +110,14 @@ export async function GET(req: Request) {
 
     const roomCode = rawRoomCode.toUpperCase();
 
+    const room = await prisma.room.findUnique({
+      where: { code: roomCode },
+      select: { id: true },
+    });
+    if (!room) {
+      return NextResponse.json({ error: 'room_not_found' }, { status: 404 });
+    }
+
     const photos = await prisma.photo.findMany({
       where: { room: { code: roomCode } },
       orderBy: { createdAt: 'desc' },

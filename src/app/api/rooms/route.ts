@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-export function randomCode(len = 6) {
+export function randomCode(len = 8) {
   // hex encoding produces only 0-9 and a-f — all alphanumeric, no stripping needed.
   return `R-${crypto.randomBytes(len).toString('hex').toUpperCase().slice(0, len)}`;
 }

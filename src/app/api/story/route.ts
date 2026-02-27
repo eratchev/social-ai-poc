@@ -189,6 +189,9 @@ export async function POST(req: Request) {
           quality: input.quality,
         });
 
+        if (tn && typeof tn !== 'object') {
+          console.warn('[story] genNarrative returned unexpected type:', typeof tn);
+        }
         const title = tn?.title || "Untitled Comic";
         const narrative = tn?.narrative || "";
 

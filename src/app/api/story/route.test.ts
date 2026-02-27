@@ -424,6 +424,41 @@ describe('/api/story', () => {
     );
   });
 
+  it('should warn when genNarrative returns a plain string (unexpected type)', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhotos = [{ id: 'photo1', storageUrl: 'http://example.com/1.jpg' }];
+    const mockStory = { id: 'story1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos as any);
+    vi.mocked(prisma.story.create).mockResolvedValue(mockStory as any);
+    vi.mocked(captionPhotosOpenAI).mockResolvedValue([]);
+    vi.mocked(mockProvider.genBeats).mockResolvedValue([]);
+    vi.mocked(mockProvider.genPanels).mockResolvedValue([]);
+    // Legacy provider returns a plain string instead of { title, narrative }
+    vi.mocked(mockProvider.genNarrative).mockResolvedValue('Some plain string' as any);
+    vi.mocked(prisma.story.update).mockResolvedValue({} as any);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const request = new Request('http://localhost/api/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode: 'TESTROOM', ownerHandle: 'testuser' }),
+    });
+
+    await POST(request);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected'),
+      expect.anything()
+    );
+
+    warnSpy.mockRestore();
+  });
+
   it('should return 500 and not call story update when error occurs before story creation', async () => {
     vi.mocked(prisma.user.upsert).mockRejectedValue(null);
 

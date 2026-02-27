@@ -15,16 +15,16 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 describe('randomCode', () => {
-  it('always produces a code with exactly 6 alphanumeric chars after R-', () => {
+  it('always produces a code with exactly 8 alphanumeric chars after R-', () => {
     for (let i = 0; i < 200; i++) {
-      expect(randomCode()).toMatch(/^R-[A-Z0-9]{6}$/);
+      expect(randomCode()).toMatch(/^R-[A-Z0-9]{8}$/);
     }
   });
 
-  it('produces exactly 6 chars even when all random bytes are 0xFF', () => {
-    // 0xFF bytes in hex → 'FFFFFF...' — all valid alphanumeric, no stripping needed
-    vi.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.alloc(6, 0xff));
-    expect(randomCode()).toBe('R-FFFFFF');
+  it('produces exactly 8 chars even when all random bytes are 0xFF', () => {
+    // 0xFF bytes in hex → 'FFFFFFFF...' — all valid alphanumeric, no stripping needed
+    vi.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.alloc(8, 0xff));
+    expect(randomCode()).toBe('R-FFFFFFFF');
     vi.restoreAllMocks();
   });
 });

@@ -255,7 +255,20 @@ describe('/api/photos', () => {
       );
     });
 
+    it('should return 404 with room_not_found when roomCode does not exist', async () => {
+      vi.mocked(prisma.room.findUnique).mockResolvedValue(null);
+
+      const request = new Request('http://localhost/api/photos?roomCode=UNKNOWN', { method: 'GET' });
+      const response = await GET(request);
+
+      expect(response.status).toBe(404);
+      const data = await response.json();
+      expect(data).toEqual({ error: 'room_not_found' });
+      expect(prisma.photo.findMany).not.toHaveBeenCalled();
+    });
+
     it('should handle GET errors', async () => {
+      vi.mocked(prisma.room.findUnique).mockResolvedValue({ id: 'room1' } as any);
       vi.mocked(prisma.photo.findMany).mockRejectedValue(new Error('DB error'));
 
       const request = new Request('http://localhost/api/photos?roomCode=DEVROOM', { method: 'GET' });
