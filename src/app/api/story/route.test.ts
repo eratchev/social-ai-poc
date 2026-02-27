@@ -388,7 +388,7 @@ describe('/api/story', () => {
     );
   });
 
-  it('should use string value as narrative when genNarrative returns a plain string', async () => {
+  it('should produce empty narrative when genNarrative returns a plain string (legacy return type discarded)', async () => {
     const mockUser = { id: 'user1' };
     const mockRoom = { id: 'room1' };
     const mockPhotos = [{ id: 'photo1', storageUrl: 'http://example.com/1.jpg' }];
