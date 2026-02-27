@@ -354,5 +354,91 @@ describe('/api/story', () => {
     const response = await POST(request);
     expect(response.status).toBe(500);
   });
+
+  it('should use "Untitled Comic" fallback when genNarrative returns object without title', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhotos = [{ id: 'photo1', storageUrl: 'http://example.com/1.jpg' }];
+    const mockStory = { id: 'story1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos as any);
+    vi.mocked(prisma.story.create).mockResolvedValue(mockStory as any);
+    vi.mocked(captionPhotosOpenAI).mockResolvedValue([]);
+    vi.mocked(mockProvider.genBeats).mockResolvedValue([]);
+    vi.mocked(mockProvider.genPanels).mockResolvedValue([]);
+    // genNarrative returns an object with neither title nor narrative
+    vi.mocked(mockProvider.genNarrative).mockResolvedValue({} as any);
+    vi.mocked(prisma.story.update).mockResolvedValue({} as any);
+
+    const request = new Request('http://localhost/api/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode: 'TESTROOM', ownerHandle: 'testuser' }),
+    });
+
+    await POST(request);
+
+    // The story update should use "Untitled Comic" as title and "" as narrative
+    expect(prisma.story.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ title: 'Untitled Comic', narrative: '' }),
+      })
+    );
+  });
+
+  it('should use string value as narrative when genNarrative returns a plain string', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhotos = [{ id: 'photo1', storageUrl: 'http://example.com/1.jpg' }];
+    const mockStory = { id: 'story1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos as any);
+    vi.mocked(prisma.story.create).mockResolvedValue(mockStory as any);
+    vi.mocked(captionPhotosOpenAI).mockResolvedValue([]);
+    vi.mocked(mockProvider.genBeats).mockResolvedValue([]);
+    vi.mocked(mockProvider.genPanels).mockResolvedValue([]);
+    // genNarrative returns a plain string (legacy provider behaviour)
+    vi.mocked(mockProvider.genNarrative).mockResolvedValue('Plain string narrative' as any);
+    vi.mocked(prisma.story.update).mockResolvedValue({} as any);
+
+    const request = new Request('http://localhost/api/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode: 'TESTROOM', ownerHandle: 'testuser' }),
+    });
+
+    await POST(request);
+
+    // title falls back to "Untitled Comic", narrative uses the string itself
+    expect(prisma.story.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Untitled Comic',
+          narrative: 'Plain string narrative',
+        }),
+      })
+    );
+  });
+
+  it('should return 500 and not call story update when error occurs before story creation', async () => {
+    vi.mocked(prisma.user.upsert).mockRejectedValue(null);
+
+    const request = new Request('http://localhost/api/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode: 'TESTROOM', ownerHandle: 'testuser' }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('internal_error');
+    // storyId was never set, so story.update should NOT have been called
+    expect(prisma.story.update).not.toHaveBeenCalled();
+  });
 });
 

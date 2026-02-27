@@ -1,5 +1,8 @@
 // lib/ai/providers.ts
 import type { Beat, Panel } from "./structured";
+import { OpenAIProvider } from "./provider-openai";
+import { AnthropicProvider } from "./provider-anthropic";
+import { MockProvider } from "./provider-mock";
 
 export type ComicAudience = "kids" | "adults";
 export type Quality = "fast" | "balanced" | "premium";
@@ -55,15 +58,8 @@ export function resolveDefaultProvider(): ProviderKind {
  * Explicit factory: construct a provider by kind.
  */
 export function getProvider(kind: ProviderKind) {
-  if (kind === "openai") {
-    const { OpenAIProvider } = require("./provider-openai");
-    return new OpenAIProvider();
-  }
-  if (kind === "anthropic") {
-    const { AnthropicProvider } = require("./provider-anthropic");
-    return new AnthropicProvider();
-  }
-  const { MockProvider } = require("./provider-mock");
+  if (kind === "openai") return new OpenAIProvider();
+  if (kind === "anthropic") return new AnthropicProvider();
   return new MockProvider();
 }
 
