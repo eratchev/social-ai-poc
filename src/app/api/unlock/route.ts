@@ -2,15 +2,17 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   const url = new URL(req.url);
-  const next = url.searchParams.get('next') || '/';
+  const rawNext = url.searchParams.get('next') || '/';
+  // Only allow relative paths — reject absolute URLs and protocol-relative URLs
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
   const form = await req.formData();
   const password = String(form.get('password') || '');
 
-  if (!process.env.ACCESS_PASSWORD) {
+  if (!process.env.UNLOCK_PASSWORD) {
     return new NextResponse('Server not configured', { status: 500 });
   }
 
-  if (password !== process.env.ACCESS_PASSWORD) {
+  if (password !== process.env.UNLOCK_PASSWORD) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
