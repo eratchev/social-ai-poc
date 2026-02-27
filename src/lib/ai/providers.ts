@@ -57,7 +57,7 @@ export function resolveDefaultProvider(): ProviderKind {
 /**
  * Explicit factory: construct a provider by kind.
  */
-export function getProvider(kind: ProviderKind) {
+export function getProvider(kind: ProviderKind): StoryProvider {
   if (kind === "openai") return new OpenAIProvider();
   if (kind === "anthropic") return new AnthropicProvider();
   return new MockProvider();
