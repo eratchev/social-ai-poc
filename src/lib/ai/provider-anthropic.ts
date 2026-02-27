@@ -48,14 +48,19 @@ function enforceComicCaps(panels: Panel[]): Panel[] {
   });
 }
 
-const CFG = getCfg("anthropic");
-const DEFAULT_MODEL = CFG.MODEL || "claude-haiku-4-5";
-
 export class AnthropicProvider implements StoryProvider {
-  private client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  private client: Anthropic;
+  private cfg: ReturnType<typeof getCfg>;
+  private defaultModel: string;
+
+  constructor() {
+    this.cfg = getCfg("anthropic");
+    this.defaultModel = this.cfg.MODEL || "claude-haiku-4-5";
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  }
 
   providerName() { return "anthropic"; }
-  modelName() { return DEFAULT_MODEL; }
+  modelName() { return this.defaultModel; }
 
   private model(quality?: Quality) {
     return getModelForQuality("anthropic", quality);
@@ -108,7 +113,7 @@ export class AnthropicProvider implements StoryProvider {
       photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
     ].join("\n");
 
-    const content: Anthropic.Messages.ContentBlockParam[] = CFG.VISION_BEATS
+    const content: Anthropic.Messages.ContentBlockParam[] = this.cfg.VISION_BEATS
       ? makeAnthropicUserContent(text, photos.map((p) => p.url))
       : [{ type: "text", text: text + "\n\n" + photos.map((p, i) => `- [${i}] ${p.url}`).join("\n") }];
 
@@ -116,8 +121,8 @@ export class AnthropicProvider implements StoryProvider {
       model: this.model(quality),
       system,
       messages: [{ role: "user", content }],
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw =
@@ -180,7 +185,7 @@ export class AnthropicProvider implements StoryProvider {
       `Photo ids (order): ${photos.map((p, i) => `[${i}]=${p.id}`).join(", ")}`,
     ].join("\n");
 
-    const content: Anthropic.Messages.ContentBlockParam[] = CFG.VISION_PANELS
+    const content: Anthropic.Messages.ContentBlockParam[] = this.cfg.VISION_PANELS
       ? makeAnthropicUserContent(text, photos.map((p) => p.url))
       : [{ type: "text", text }];
 
@@ -188,8 +193,8 @@ export class AnthropicProvider implements StoryProvider {
       model: this.model(quality),
       system,
       messages: [{ role: "user", content }],
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw =
@@ -242,8 +247,8 @@ export class AnthropicProvider implements StoryProvider {
       model: this.model(quality),
       system,
       messages: [{ role: "user", content: [{ type: "text", text: userText } as const] }],
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw =

@@ -50,14 +50,19 @@ function enforceComicCaps(panels: Panel[]): Panel[] {
   });
 }
 
-const CFG = getCfg("openai");
-const DEFAULT_MODEL = CFG.MODEL || "gpt-4o-mini";
-
 export class OpenAIProvider implements StoryProvider {
-  private client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  private client: OpenAI;
+  private cfg: ReturnType<typeof getCfg>;
+  private defaultModel: string;
+
+  constructor() {
+    this.cfg = getCfg("openai");
+    this.defaultModel = this.cfg.MODEL || "gpt-4o-mini";
+    this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  }
 
   providerName() { return "openai"; }
-  modelName() { return DEFAULT_MODEL; }
+  modelName() { return this.defaultModel; }
 
   private model(quality?: Quality) {
     return getModelForQuality("openai", quality);
@@ -112,7 +117,7 @@ export class OpenAIProvider implements StoryProvider {
       photos.map((p, i) => `- [${i}] ${p.caption ? `"${p.caption}"` : "(no caption)"}`).join("\n"),
     ].join("\n");
 
-    const messages: ChatCompletionMessageParam[] = CFG.VISION_BEATS
+    const messages: ChatCompletionMessageParam[] = this.cfg.VISION_BEATS
       ? [
           { role: "system", content: system },
           {
@@ -142,8 +147,8 @@ export class OpenAIProvider implements StoryProvider {
     const resp = await this.client.chat.completions.create({
       model: this.model(quality),
       messages,
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
@@ -205,7 +210,7 @@ export class OpenAIProvider implements StoryProvider {
       `Photo ids (order): ${photos.map((p, i) => `[${i}]=${p.id}`).join(", ")}`,
     ].join("\n");
 
-    const messages: ChatCompletionMessageParam[] = CFG.VISION_PANELS
+    const messages: ChatCompletionMessageParam[] = this.cfg.VISION_PANELS
       ? [
           { role: "system", content: system },
           {
@@ -224,8 +229,8 @@ export class OpenAIProvider implements StoryProvider {
     const resp = await this.client.chat.completions.create({
       model: this.model(quality),
       messages,
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
@@ -282,8 +287,8 @@ export class OpenAIProvider implements StoryProvider {
     const resp = await this.client.chat.completions.create({
       model: this.model(quality),
       messages,
-      temperature: CFG.TEMPERATURE,
-      max_tokens: CFG.MAX_TOKENS,
+      temperature: this.cfg.TEMPERATURE,
+      max_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = (resp.choices?.[0]?.message?.content ?? "").trim();

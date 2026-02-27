@@ -26,6 +26,18 @@ export async function POST(req: Request) {
       });
     }
 
+    // Ensure the story exists and is in READY state before assigning a public slug
+    const existing = await prisma.story.findFirst({
+      where: { id, status: 'READY' },
+      select: { id: true },
+    });
+    if (!existing) {
+      return new Response(JSON.stringify({ error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     // Generate a new slug; retry once if unique constraint clashes (rare)
     for (let i = 0; i < 2; i++) {
       const candidate = makeSlug();

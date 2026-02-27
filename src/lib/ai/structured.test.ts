@@ -47,6 +47,10 @@ describe('structured', () => {
     it('should handle empty string', () => {
       expect(() => safeJson('')).toThrow();
     });
+
+    it('safeJson throws a descriptive error for non-JSON content', () => {
+      expect(() => safeJson('not json at all')).toThrow(/safeJson: invalid JSON/);
+    });
   });
 
   describe('validateBeats', () => {

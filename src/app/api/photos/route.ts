@@ -37,10 +37,20 @@ export async function POST(req: Request) {
       bytes,
       format,
       folder,
-      roomCode = 'DEVROOM',
+      roomCode: rawRoomCode = 'DEVROOM',
       ownerHandle = 'devuser',
       takenAt,
     } = json;
+
+    // Bug 5 fix: always normalise room code to uppercase
+    const roomCode = rawRoomCode.toUpperCase();
+
+    // Bug 6 fix: validate the date and fall back to null if invalid
+    let takenAtDate: Date | null = null;
+    if (takenAt) {
+      const d = new Date(takenAt);
+      takenAtDate = isNaN(d.getTime()) ? null : d;
+    }
 
     // 1) User upsert
     const user = await prisma.user.upsert({
@@ -77,7 +87,7 @@ export async function POST(req: Request) {
         bytes: Number.isFinite(bytes) ? Number(bytes) : null,
         format: typeof format === 'string' ? format : null,
         folder: typeof folder === 'string' ? folder : null,
-        takenAt: takenAt ? new Date(takenAt) : null,
+        takenAt: takenAtDate,
       },
     });
 
@@ -88,9 +98,20 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    // Bug 7 fix: accept optional roomCode query param; return empty array if omitted
+    const { searchParams } = new URL(req.url);
+    const rawRoomCode = searchParams.get('roomCode');
+
+    if (!rawRoomCode) {
+      return NextResponse.json({ photos: [] });
+    }
+
+    const roomCode = rawRoomCode.toUpperCase();
+
     const photos = await prisma.photo.findMany({
+      where: { room: { code: roomCode } },
       orderBy: { createdAt: 'desc' },
       select: { id: true, storageUrl: true, publicId: true, createdAt: true },
       take: 60,

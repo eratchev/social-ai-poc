@@ -115,34 +115,151 @@ describe('/api/photos', () => {
     });
   });
 
+  // Bug 5 — roomCode not uppercased
+  it('should uppercase roomCode before querying/creating room', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhoto = { id: 'photo1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.room.create).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.create).mockResolvedValue(mockPhoto as any);
+
+    const request = new Request('http://localhost/api/photos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicId: 'test-id',
+        secureUrl: 'http://example.com/photo.jpg',
+        roomCode: 'devroom',
+      }),
+    });
+
+    await POST(request);
+
+    expect(prisma.room.findUnique).toHaveBeenCalledWith({
+      where: { code: 'DEVROOM' },
+      select: { id: true },
+    });
+    expect(prisma.room.create).toHaveBeenCalledWith({
+      data: {
+        code: 'DEVROOM',
+        createdBy: 'user1',
+      },
+      select: { id: true },
+    });
+  });
+
+  // Bug 6 — Invalid Date not validated
+  it('should treat an invalid takenAt string as null', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhoto = { id: 'photo1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.create).mockResolvedValue(mockPhoto as any);
+
+    const request = new Request('http://localhost/api/photos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicId: 'test-id',
+        secureUrl: 'http://example.com/photo.jpg',
+        takenAt: 'garbage',
+      }),
+    });
+
+    await POST(request);
+
+    const createCall = vi.mocked(prisma.photo.create).mock.calls[0][0];
+    expect(createCall.data.takenAt).toBeNull();
+  });
+
+  it('should store a valid takenAt date correctly', async () => {
+    const mockUser = { id: 'user1' };
+    const mockRoom = { id: 'room1' };
+    const mockPhoto = { id: 'photo1' };
+
+    vi.mocked(prisma.user.upsert).mockResolvedValue(mockUser as any);
+    vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+    vi.mocked(prisma.photo.create).mockResolvedValue(mockPhoto as any);
+
+    const request = new Request('http://localhost/api/photos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicId: 'test-id',
+        secureUrl: 'http://example.com/photo.jpg',
+        takenAt: '2024-06-15T12:00:00Z',
+      }),
+    });
+
+    await POST(request);
+
+    const createCall = vi.mocked(prisma.photo.create).mock.calls[0][0];
+    expect(createCall.data.takenAt).toEqual(new Date('2024-06-15T12:00:00Z'));
+  });
+
   describe('GET', () => {
-    it('should return photos', async () => {
-      const date1 = new Date('2024-01-01');
-      const date2 = new Date('2024-01-02');
-      const mockPhotos = [
-        { id: '1', storageUrl: 'http://example.com/1.jpg', publicId: 'id1', createdAt: date1 },
-        { id: '2', storageUrl: 'http://example.com/2.jpg', publicId: 'id2', createdAt: date2 },
-      ];
+    // Bug 7 — GET /api/photos returns all photos from all rooms
+    it('should return empty array when no roomCode query param is provided', async () => {
+      const request = new Request('http://localhost/api/photos', { method: 'GET' });
 
-      vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos as any);
-
-      const response = await GET();
+      const response = await GET(request);
       const data = await response.json();
 
-      expect(data.photos).toHaveLength(2);
-      expect(data.photos[0].id).toBe('1');
-      expect(data.photos[1].id).toBe('2');
+      expect(data.photos).toEqual([]);
+      expect(prisma.photo.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should filter photos by roomCode when provided as a query param', async () => {
+      const mockRoom = { id: 'room1' };
+      const mockPhotos = [
+        { id: '1', storageUrl: 'http://example.com/1.jpg', publicId: 'id1', createdAt: new Date('2024-01-01') },
+      ];
+
+      vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+      vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos as any);
+
+      const request = new Request('http://localhost/api/photos?roomCode=DEVROOM', { method: 'GET' });
+
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(data.photos).toHaveLength(1);
       expect(prisma.photo.findMany).toHaveBeenCalledWith({
+        where: { room: { code: 'DEVROOM' } },
         orderBy: { createdAt: 'desc' },
         select: { id: true, storageUrl: true, publicId: true, createdAt: true },
         take: 60,
       });
     });
 
-    it('should handle errors', async () => {
+    it('should uppercase the roomCode query param before filtering', async () => {
+      const mockRoom = { id: 'room1' };
+      const mockPhotos: any[] = [];
+
+      vi.mocked(prisma.room.findUnique).mockResolvedValue(mockRoom as any);
+      vi.mocked(prisma.photo.findMany).mockResolvedValue(mockPhotos);
+
+      const request = new Request('http://localhost/api/photos?roomCode=devroom', { method: 'GET' });
+
+      await GET(request);
+
+      expect(prisma.photo.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { room: { code: 'DEVROOM' } },
+        }),
+      );
+    });
+
+    it('should handle GET errors', async () => {
       vi.mocked(prisma.photo.findMany).mockRejectedValue(new Error('DB error'));
 
-      const response = await GET();
+      const request = new Request('http://localhost/api/photos?roomCode=DEVROOM', { method: 'GET' });
+      const response = await GET(request);
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toBe('internal_error');

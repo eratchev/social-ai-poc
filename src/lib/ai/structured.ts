@@ -106,7 +106,12 @@ export function safeJson<T>(raw: string): T {
     first !== Number.MAX_SAFE_INTEGER && last > first
       ? trimmed.slice(first, last + 1)
       : trimmed;
-  return JSON.parse(slice) as T;
+  try {
+    return JSON.parse(slice) as T;
+  } catch {
+    const preview = raw.slice(0, 100);
+    throw new Error(`safeJson: invalid JSON after stripping fences: ${preview}`);
+  }
 }
 
 /**
