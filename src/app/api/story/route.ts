@@ -6,6 +6,7 @@ import {
   getStoryProvider,
   resolveDefaultProvider,
   type ProviderKind,
+  type TitleNarrative,
 } from "@/lib/ai/providers";
 import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
 import { getModelForQuality } from "@/lib/ai/config";
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
     // 7) Prepare photo args (+ captions if available)
     let photoArgs = photos.map((p) => ({
       id: p.id,
-      url: p.storageUrl as string,
+      url: p.storageUrl,
       caption: undefined as string | undefined,
     }));
 
@@ -187,7 +188,7 @@ export async function POST(req: Request) {
           wordCount: 90,
           comicAudience: input.comicAudience,
           quality: input.quality,
-        });
+        }) as TitleNarrative | undefined;
 
         if (tn && typeof tn !== 'object') {
           console.warn('[story] genNarrative returned unexpected type:', typeof tn);
@@ -240,15 +241,16 @@ export async function POST(req: Request) {
         panelCount,
       },
     });
-  } catch (err: any) {
-    console.error("POST /api/story error", err?.message || err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err ?? "unknown_error");
+    console.error("POST /api/story error", errMsg);
     if (storyId) {
       try {
         await prisma.story.update({
           where: { id: storyId },
           data: {
             status: "ERROR",
-            error: String(err?.message || err || "unknown_error").slice(0, 512),
+            error: errMsg.slice(0, 512),
           },
         });
       } catch (e) {

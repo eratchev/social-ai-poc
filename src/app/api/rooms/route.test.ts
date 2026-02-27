@@ -23,7 +23,8 @@ describe('randomCode', () => {
 
   it('produces exactly 8 chars even when all random bytes are 0xFF', () => {
     // 0xFF bytes in hex → 'FFFFFFFF...' — all valid alphanumeric, no stripping needed
-    vi.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.alloc(8, 0xff));
+    // ceil(8/2) = 4 bytes needed to produce 8 hex chars (1 byte = 2 hex chars)
+    vi.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.alloc(4, 0xff));
     expect(randomCode()).toBe('R-FFFFFFFF');
     vi.restoreAllMocks();
   });

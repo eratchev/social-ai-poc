@@ -5,8 +5,8 @@ import crypto from 'crypto';
 export const runtime = 'nodejs';
 
 export function randomCode(len = 8) {
-  // hex encoding produces only 0-9 and a-f — all alphanumeric, no stripping needed.
-  return `R-${crypto.randomBytes(len).toString('hex').toUpperCase().slice(0, len)}`;
+  // Each byte encodes to 2 hex chars, so we need ceil(len/2) bytes for len hex chars.
+  return `R-${crypto.randomBytes(Math.ceil(len / 2)).toString('hex').toUpperCase().slice(0, len)}`;
 }
 
 export async function POST(req: Request) {
