@@ -4,7 +4,9 @@ import { prisma } from '@/lib/prisma';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    $queryRaw: vi.fn(),
+    heartbeat: {
+      upsert: vi.fn(),
+    },
   },
 }));
 
@@ -18,7 +20,7 @@ describe('/api/health', () => {
   });
 
   it('should return health status when DB is up', async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
+    vi.mocked(prisma.heartbeat.upsert).mockResolvedValue({ id: 1, updatedAt: new Date() });
     process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
     process.env.CLOUDINARY_UPLOAD_PRESET = 'test-preset';
 
@@ -33,7 +35,7 @@ describe('/api/health', () => {
   });
 
   it('should return error when DB is down', async () => {
-    vi.mocked(prisma.$queryRaw).mockRejectedValue(new Error('DB error'));
+    vi.mocked(prisma.heartbeat.upsert).mockRejectedValue(new Error('DB error'));
 
     const response = await GET();
     const data = await response.json();
@@ -44,7 +46,7 @@ describe('/api/health', () => {
   });
 
   it('should indicate missing cloudinary config', async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
+    vi.mocked(prisma.heartbeat.upsert).mockResolvedValue({ id: 1, updatedAt: new Date() });
 
     const response = await GET();
     const data = await response.json();
@@ -55,7 +57,7 @@ describe('/api/health', () => {
   });
 
   it('should detect vercel environment', async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ '?column?': 1 }]);
+    vi.mocked(prisma.heartbeat.upsert).mockResolvedValue({ id: 1, updatedAt: new Date() });
     process.env.VERCEL = '1';
 
     const response = await GET();
@@ -64,4 +66,3 @@ describe('/api/health', () => {
     expect(data.env).toBe('vercel');
   });
 });
-

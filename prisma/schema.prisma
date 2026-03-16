@@ -69,6 +69,13 @@ model Photo {
   @@index([createdAt])
 }
 
+// Single-row table written on every /api/health call to satisfy Supabase's
+// activity detection (SELECT 1 is no longer sufficient to prevent auto-pause).
+model Heartbeat {
+  id        Int      @id @default(1)
+  updatedAt DateTime @updatedAt
+}
+
 model Story {
   id      String @id @default(cuid())
   roomId  String

@@ -5,8 +5,12 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    // Quick DB ping
-    await prisma.$queryRaw`SELECT 1`;
+    // Write to DB so Supabase counts this as real activity (SELECT 1 no longer prevents auto-pause)
+    await prisma.heartbeat.upsert({
+      where: { id: 1 },
+      update: {},
+      create: { id: 1 },
+    });
 
     // Return minimal env hints (non-sensitive)
     return NextResponse.json({
