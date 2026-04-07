@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import GenerateStoryButton from './GenerateStoryButton';
 
 const mockPush = vi.fn();
@@ -88,7 +88,9 @@ describe('GenerateStoryButton', () => {
     fireEvent.click(screen.getByRole('button'));
 
     // Advance past the 1500ms poll interval
-    await vi.advanceTimersByTimeAsync(1600);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600);
+    });
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/s/test-slug');
@@ -115,7 +117,9 @@ describe('GenerateStoryButton', () => {
     render(<GenerateStoryButton roomCode="TEST" />);
     fireEvent.click(screen.getByRole('button'));
 
-    await vi.advanceTimersByTimeAsync(1600);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600);
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/Generation failed/i)).toBeInTheDocument();

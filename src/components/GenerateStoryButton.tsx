@@ -40,10 +40,13 @@ export default function GenerateStoryButton({
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     setMounted(true);
     return () => {
+      mountedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
@@ -60,7 +63,7 @@ export default function GenerateStoryButton({
           const j = await r.json();
           failCount = 0;
 
-          if (j.phase) setPhase(j.phase as Phase);
+          if (mountedRef.current && j.phase) setPhase(j.phase as Phase);
 
           if (j.status === 'READY') {
             clearInterval(intervalRef.current!);
@@ -124,8 +127,8 @@ export default function GenerateStoryButton({
       } catch {}
 
       router.push(`/s/${shareJson.shareSlug}`);
-    } catch (e: any) {
-      setErr(e?.message || 'Unexpected error');
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Unexpected error');
     } finally {
       setLoading(false);
       setPhase(null);
