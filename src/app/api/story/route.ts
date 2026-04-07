@@ -1,55 +1,23 @@
-// src/app/api/story/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import {
-  getStoryProvider,
-  resolveDefaultProvider,
-  type ProviderKind,
-  type TitleNarrative,
-} from "@/lib/ai/providers";
-import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
-import { getModelForQuality } from "@/lib/ai/config";
+import { resolveDefaultProvider, type ProviderKind } from "@/lib/ai/providers";
 
 export const runtime = "nodejs";
 
-/** Request body schema */
 const Body = z.object({
   roomCode: z.string().min(1),
   ownerHandle: z.string().min(1).default("devuser"),
-
-  // creative knobs
-  audience: z.string().optional(), // e.g. "kids-10-12" or "adults"
-  style: z.string().optional(),    // e.g. "funny", "witty"
-  tone: z.string().optional(),     // e.g. "wholesome", "snarky"
-
-  // comic preset
+  audience: z.string().optional(),
+  style: z.string().optional(),
+  tone: z.string().optional(),
   comicAudience: z.enum(["kids", "adults"]).default("kids"),
-
-  // NEW: quality preset
   quality: z.enum(["fast", "balanced", "premium"]).default("balanced"),
-
-  // provider choice (optional; server resolves default from available API keys)
   provider: z.enum(["openai", "anthropic", "mock"]).optional(),
-
-  // panel count (for comic feel keep small)
   panelCount: z.number().int().min(1).max(24).optional(),
 });
 
-/** Simple timeout wrapper */
-async function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
-    ),
-  ]);
-}
-
 export async function POST(req: Request) {
-  const started = Date.now();
-  let storyId: string | null = null;
-
   try {
     const json = await req.json();
     const input = Body.parse(json);
@@ -75,18 +43,28 @@ export async function POST(req: Request) {
       });
     }
 
-    // 3) Collect photos for this room
+    // 3) Check photos exist and compute panelCount heuristic
     const photos = await prisma.photo.findMany({
       where: { roomId: room.id },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, storageUrl: true },
-      take: 12, // cap
+      select: { id: true },
+      take: 12,
     });
     if (photos.length === 0) {
       return NextResponse.json({ error: "no_photos_in_room" }, { status: 400 });
     }
 
-    // 4) Create Story row in PROCESSING
+    // 4) Resolve provider and prompt knobs
+    const chosen: ProviderKind =
+      (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
+    const promptAudience =
+      input.audience ?? (input.comicAudience === "kids" ? "kids-10-12" : "adults");
+    const promptStyle = input.style ?? "funny";
+    const promptTone =
+      input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty");
+    const panelCount =
+      input.panelCount ?? Math.min(6, Math.max(4, photos.length));
+
+    // 5) Create Story row in PROCESSING; store params so /run can read them
     const created = await prisma.story.create({
       data: {
         roomId: room.id,
@@ -96,167 +74,24 @@ export async function POST(req: Request) {
         beatsJson: [],
         panelMap: [],
         status: "PROCESSING",
-        model: undefined,
-        prompt: undefined,
-        error: null,
-      },
-      select: { id: true },
-    });
-    storyId = created.id;
-
-    // 5) Decide provider (user-selected or resolved by available keys)
-    const chosen: ProviderKind =
-      (input.provider as ProviderKind | undefined) ?? resolveDefaultProvider();
-    const provider = getStoryProvider(chosen);
-
-    // 6) Panel count heuristic: 4–6 (comic-y), clamped by photos
-    const panelCount =
-      input.panelCount ?? Math.min(6, Math.max(4, photos.length));
-
-    // 7) Prepare photo args (+ captions if available)
-    let photoArgs = photos.map((p) => ({
-      id: p.id,
-      url: p.storageUrl,
-      caption: undefined as string | undefined,
-    }));
-
-    // Caption pass (batched best-effort; failure is non-fatal)
-    try {
-      const caps = await captionPhotosOpenAI(
-        photos.map((p) => ({ id: p.id, url: p.storageUrl }))
-      );
-      const byId = new Map(caps.map((c) => [c.id, c]));
-      photoArgs = photoArgs.map((p) => {
-        const hit = byId.get(p.id);
-        return hit?.caption ? { ...p, caption: hit.caption } : p;
-      });
-
-      // Persist new captions (best-effort)
-      await prisma.$transaction(
-        caps
-          .filter((c) => c.caption)
-          .map((c) =>
-            prisma.photo.update({
-              where: { id: c.id },
-              data: { caption: c.caption },
-            })
-          )
-      );
-    } catch (e) {
-      console.warn(
-        "[captions] skipping due to error:",
-        (e as Error)?.message || e
-      );
-    }
-
-    // Common knobs derived from presets
-    const promptAudience =
-      input.audience ??
-      (input.comicAudience === "kids" ? "kids-10-12" : "adults");
-    const promptStyle = input.style ?? "funny";
-    const promptTone =
-      input.tone ?? (input.comicAudience === "kids" ? "wholesome" : "witty");
-
-    // 8) Generate (with timeouts)
-    const { beats, panels, title, narrative } = await withTimeout(
-      (async () => {
-        // Beats
-        const beats = await provider.genBeats({
-          photos: photoArgs,
-          audience: promptAudience,
-          style: promptStyle,
-          tone: promptTone,
-          comicAudience: input.comicAudience,
-          quality: input.quality,
-        });
-
-        // Panels
-        const panels = await provider.genPanels({
-          beats,
-          photos: photoArgs,
-          panelCount,
-          comicAudience: input.comicAudience,
-          quality: input.quality,
-        });
-
-        // Narrative (very short blurb for comic vibe)
-        const tn = await provider.genNarrative({
-          beats,
-          audience: promptAudience,
-          style: promptStyle,
-          tone: promptTone,
-          wordCount: 90,
-          comicAudience: input.comicAudience,
-          quality: input.quality,
-        }) as TitleNarrative | undefined;
-
-        if (tn && typeof tn !== 'object') {
-          console.warn('[story] genNarrative returned unexpected type:', typeof tn);
-        }
-        const title = tn?.title || "Untitled Comic";
-        const narrative = tn?.narrative || "";
-
-        return { beats, panels, title, narrative };
-      })(),
-      45_000
-    );
-
-    // 9) Persist READY — also record the concrete model resolved for the chosen preset
-    const resolvedModel = getModelForQuality(chosen, input.quality);
-
-    await prisma.story.update({
-      where: { id: storyId },
-      data: {
-        title,
-        narrative,
-        beatsJson: beats as unknown as object,
-        panelMap: panels as unknown as object,
-        status: "READY",
-        model: resolvedModel,
+        phase: null,
         prompt: JSON.stringify({
           provider: chosen,
           quality: input.quality,
           comicAudience: input.comicAudience,
-          audience: input.audience,
-          tone: input.tone,
-          style: input.style,
+          audience: promptAudience,
+          tone: promptTone,
+          style: promptStyle,
           panelCount,
-          startedAt: started,
         }),
-        error: null,
       },
+      select: { id: true },
     });
 
-    return NextResponse.json({
-      id: storyId,
-      status: "READY",
-      model: resolvedModel,
-      settings: {
-        provider: chosen,
-        quality: input.quality,
-        comicAudience: input.comicAudience,
-        audience: input.audience ?? promptAudience,
-        tone: input.tone ?? promptTone,
-        style: input.style ?? promptStyle,
-        panelCount,
-      },
-    });
+    return NextResponse.json({ id: created.id });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err ?? "unknown_error");
     console.error("POST /api/story error", errMsg);
-    if (storyId) {
-      try {
-        await prisma.story.update({
-          where: { id: storyId },
-          data: {
-            status: "ERROR",
-            error: errMsg.slice(0, 512),
-          },
-        });
-      } catch (e) {
-        console.error("Failed to mark story as ERROR", e);
-      }
-    }
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
