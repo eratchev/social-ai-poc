@@ -33,6 +33,7 @@ export async function GET(req: Request) {
         title: story.title,
         narrative: story.narrative,
         status: story.status,
+        phase: story.phase,
         beats: story.beatsJson,
         panels: story.panelMap,
         shareSlug: story.shareSlug,

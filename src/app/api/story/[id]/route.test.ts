@@ -72,5 +72,29 @@ describe('/api/story/[id]', () => {
     const data = await response.json();
     expect(data.error).toBe('internal_error');
   });
+
+  it('should include phase in response', async () => {
+    const mockStory = {
+      id: 'story1',
+      title: 'Test Story',
+      narrative: 'Test narrative',
+      status: 'PROCESSING',
+      phase: 'panels',
+      beatsJson: [],
+      panelMap: [],
+      shareSlug: null,
+      createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-02'),
+      room: { code: 'ROOM1' },
+    };
+
+    vi.mocked(prisma.story.findUnique).mockResolvedValue(mockStory as any);
+
+    const request = new Request('http://localhost/api/story/story1');
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(data.phase).toBe('panels');
+  });
 });
 
