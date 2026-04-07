@@ -17,12 +17,13 @@ function getIdFromUrl(url: string): string | undefined {
   return match?.[1];
 }
 
-async function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
-    p,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms)
-    ),
+    p.finally(() => clearTimeout(timer)),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`timeout_${ms}ms`)), ms);
+    }),
   ]);
 }
 
