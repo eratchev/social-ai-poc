@@ -88,6 +88,7 @@ model Story {
   renderedUrl String? // png/pdf
 
   status    StoryStatus @default(PENDING)
+  phase     String? // "beats" | "panels" | "narrative" | null
   error     String?
   model     String?
   prompt    String?
