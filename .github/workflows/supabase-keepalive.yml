@@ -2,8 +2,8 @@ name: Supabase keep-alive
 
 on:
   schedule:
-    # Every 3 days at 08:00 UTC (Supabase pauses after 7 days of inactivity)
-    - cron: '0 8 */3 * *'
+    # Every 2 days at 08:00 UTC (Supabase pauses after 7 days of inactivity)
+    - cron: '0 8 */2 * *'
   workflow_dispatch: # allow manual trigger
 
 jobs:

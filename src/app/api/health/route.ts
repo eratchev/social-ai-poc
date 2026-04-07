@@ -8,7 +8,7 @@ export async function GET() {
     // Write to DB so Supabase counts this as real activity (SELECT 1 no longer prevents auto-pause)
     await prisma.heartbeat.upsert({
       where: { id: 1 },
-      update: {},
+      update: { updatedAt: new Date() },
       create: { id: 1 },
     });
 
