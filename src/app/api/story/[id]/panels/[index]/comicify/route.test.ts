@@ -112,7 +112,6 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     vi.mocked(prisma.story.findUnique).mockResolvedValue(readyStory as any);
     vi.mocked(prisma.photo.findUnique).mockResolvedValue({
       storageUrl: 'https://res.cloudinary.com/test/original.jpg',
-      format: 'jpg',
     } as any);
 
     const { POST } = await import('./route');
@@ -150,7 +149,6 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     vi.mocked(prisma.story.findUnique).mockResolvedValue(readyStory as any);
     vi.mocked(prisma.photo.findUnique).mockResolvedValue({
       storageUrl: 'https://res.cloudinary.com/test/original.jpg',
-      format: 'jpg',
     } as any);
     mockImagesEdit.mockRejectedValue(new Error('OpenAI error'));
 
@@ -165,7 +163,6 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     vi.mocked(prisma.story.findUnique).mockResolvedValue(readyStory as any);
     vi.mocked(prisma.photo.findUnique).mockResolvedValue({
       storageUrl: 'https://res.cloudinary.com/test/original.jpg',
-      format: 'jpg',
     } as any);
     mockUpload.mockRejectedValue(new Error('Cloudinary error'));
 

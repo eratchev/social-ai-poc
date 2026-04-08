@@ -56,21 +56,22 @@ export async function POST(
     // 3. Look up photo storageUrl and format
     const photo = await prisma.photo.findUnique({
       where: { id: panel.photoId },
-      select: { storageUrl: true, format: true },
+      select: { storageUrl: true },
     });
 
     if (!photo) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    // 4. Fetch photo bytes
-    const photoRes = await fetch(photo.storageUrl);
+    // 4. Fetch photo bytes as PNG (dall-e-2 images.edit only accepts image/png)
+    // Cloudinary auto-converts on extension change — swap any stored extension for .png
+    const pngUrl = photo.storageUrl.replace(/\.\w+$/, '.png');
+    const photoRes = await fetch(pngUrl);
     if (!photoRes.ok) {
       throw new Error(`Failed to fetch photo: ${photoRes.status}`);
     }
     const buffer = Buffer.from(await photoRes.arrayBuffer());
-    const mimeType = photo.format ? `image/${photo.format}` : 'image/jpeg';
-    const imageFile = new File([buffer], `panel.${photo.format ?? 'jpg'}`, { type: mimeType });
+    const imageFile = new File([buffer], 'panel.png', { type: 'image/png' });
 
     // 5. Generate comic illustration via OpenAI
     const result = await openai.images.edit({
