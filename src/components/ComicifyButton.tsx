@@ -33,6 +33,7 @@ export default function ComicifyButton({ storyId, panels, onPanelDone }: Comicif
   async function handleComicify() {
     setGenerating(true);
     setProgress(0);
+    let successCount = 0;
 
     for (const panel of panelsWithPhotos) {
       setProgress(panel.index + 1);
@@ -44,13 +45,14 @@ export default function ComicifyButton({ storyId, panels, onPanelDone }: Comicif
         if (!res.ok) continue;
         const { generatedImageUrl } = await res.json();
         onPanelDone(panel.index, generatedImageUrl);
+        successCount++;
       } catch {
         // skip failed panels silently
       }
     }
 
     setGenerating(false);
-    setDone(true);
+    if (successCount > 0) setDone(true);
   }
 
   return (

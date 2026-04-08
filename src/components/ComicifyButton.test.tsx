@@ -114,6 +114,24 @@ describe('ComicifyButton', () => {
     expect(onPanelDone).toHaveBeenCalledWith(1, 'https://cdn.example.com/comic.png');
   });
 
+  it('returns to idle state when all panels fail', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 } as any);
+    const onPanelDone = vi.fn();
+
+    render(
+      <ComicifyButton storyId="s1" panels={panelsWithPhotos} onPanelDone={onPanelDone} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /generate comic art/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    expect(onPanelDone).not.toHaveBeenCalled();
+    // Button should reappear (not show "done" state)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /generate comic art/i })).toBeInTheDocument()
+    );
+  });
+
   it('disables the button and shows progress while generating', async () => {
     let resolveFirst!: (v: unknown) => void;
     const firstPending = new Promise((res) => { resolveFirst = res; });
