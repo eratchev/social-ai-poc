@@ -22,6 +22,7 @@ vi.mock('cloudinary', () => ({
 
 vi.mock('sharp', () => ({
   default: vi.fn().mockReturnValue({
+    resize: vi.fn().mockReturnThis(),
     ensureAlpha: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
     toBuffer: mockSharpToBuffer,

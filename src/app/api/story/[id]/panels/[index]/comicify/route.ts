@@ -72,8 +72,12 @@ export async function POST(
       throw new Error(`Failed to fetch photo: ${photoRes.status}`);
     }
     const buffer = Buffer.from(await photoRes.arrayBuffer());
-    // dall-e-2 images.edit requires RGBA PNG — ensure alpha channel is present
-    const rgbaBuffer = await sharp(buffer).ensureAlpha().png().toBuffer();
+    // dall-e-2 images.edit requires a square RGBA PNG under 4 MB
+    const rgbaBuffer = await sharp(buffer)
+      .resize(1024, 1024, { fit: 'cover' })
+      .ensureAlpha()
+      .png({ compressionLevel: 9 })
+      .toBuffer();
     const imageFile = new File([new Uint8Array(rgbaBuffer)], 'panel.png', { type: 'image/png' });
 
     // 5. Generate comic illustration via OpenAI
