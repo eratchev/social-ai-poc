@@ -39,6 +39,7 @@ export default function UploadClient({
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dropRef = useRef<HTMLDivElement | null>(null);
@@ -238,9 +239,14 @@ export default function UploadClient({
   }
 
   const startUpload = async () => {
-    if (files.length === 0) return;
-    await uploadMany(files, 3);
-    setFiles([]);
+    if (files.length === 0 || uploading) return;
+    setUploading(true);
+    try {
+      await uploadMany(files, 3);
+      setFiles([]);
+    } finally {
+      setUploading(false);
+    }
   };
 
   // ---------- UI ----------
@@ -299,9 +305,9 @@ export default function UploadClient({
                 <button
                   onClick={startUpload}
                   className="btn btn-primary disabled:opacity-50"
-                  disabled={files.length === 0}
+                  disabled={files.length === 0 || uploading}
                 >
-                  Upload {files.length > 1 ? 'files' : 'file'}
+                  {uploading ? 'Uploading…' : `Upload ${files.length > 1 ? 'files' : 'file'}`}
                 </button>
                 <button onClick={() => setFiles([])} className="btn btn-outline">
                   Clear list
