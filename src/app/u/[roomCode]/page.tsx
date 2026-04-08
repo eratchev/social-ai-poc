@@ -4,8 +4,8 @@ import UploadClient from '@/components/UploadClient';
 import StoryControls from '@/components/StoryControls';
 import HomeLink from '@/components/HomeLink';
 import ShareStoryQuick from '@/components/ShareStoryQuick';
+import GalleryLive from '@/components/GalleryLive';
 import Link from 'next/link';
-import Image from 'next/image';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,25 +65,6 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
     // we don't pass caption into UploadClient right now—kept simple
   }));
 
-  const renderImg = (
-    p: { storageUrl: string; width: number | null; height: number | null },
-    priority = false
-  ) => {
-    const w = p.width && p.width > 0 ? p.width : 1200;
-    const h = p.height && p.height > 0 ? p.height : 900;
-    return (
-      <Image
-        src={p.storageUrl}
-        alt=""
-        width={w}
-        height={h}
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        className="w-full h-auto object-cover rounded"
-        priority={priority}
-      />
-    );
-  };
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -131,49 +112,8 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
         )}
       </section>
 
-      {/* Masonry Gallery with captions */}
-      <section className="card p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold">Gallery</h2>
-          <span className="muted">
-            {room.photos.length} item{room.photos.length === 1 ? '' : 's'}
-          </span>
-        </div>
-
-        {room.photos.length === 0 ? (
-          <p className="muted">No images yet — upload some below!</p>
-        ) : (
-          <ul className="columns-2 md:columns-3 gap-4 [column-fill:_balance]">
-            {room.photos.map((p, i) => (
-              <li
-                key={p.id}
-                className="mb-4 break-inside-avoid rounded-xl border bg-white overflow-hidden"
-                title={p.publicId || p.id}
-              >
-                <a href={p.storageUrl} target="_blank" rel="noreferrer" className="block">
-                  {renderImg(p, i < 3)}
-                </a>
-                {/* Caption (if available) */}
-                {/*
-                  If your Photo model doesn't have `caption`, this will simply not render any text.
-                  To add captions permanently, add `caption String?` to the Photo model and fill it during captioning step.
-                */}
-                {((p as any).caption)?.length ? (
-                  <div className="border-t px-3 py-2 bg-gray-50 dark:bg-zinc-900">
-                    <p
-                      className="text-xs text-gray-700 dark:text-zinc-300 truncate"
-                      title={(p as any).caption}
-                      aria-label="Photo caption"
-                    >
-                      {(p as any).caption}
-                    </p>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Gallery with hover delete */}
+      <GalleryLive roomCode={room.code} initial={room.photos} />
 
       {/* Uploader */}
       <section className="card p-5">
