@@ -53,10 +53,10 @@ export async function POST(
       return NextResponse.json({ error: 'no_photo' }, { status: 400 });
     }
 
-    // 3. Look up photo storageUrl
+    // 3. Look up photo storageUrl and format
     const photo = await prisma.photo.findUnique({
       where: { id: panel.photoId },
-      select: { storageUrl: true },
+      select: { storageUrl: true, format: true },
     });
 
     if (!photo) {
@@ -65,14 +65,19 @@ export async function POST(
 
     // 4. Fetch photo bytes
     const photoRes = await fetch(photo.storageUrl);
+    if (!photoRes.ok) {
+      throw new Error(`Failed to fetch photo: ${photoRes.status}`);
+    }
     const buffer = Buffer.from(await photoRes.arrayBuffer());
-    const imageFile = new File([buffer], 'panel.jpg', { type: 'image/jpeg' });
+    const mimeType = photo.format ? `image/${photo.format}` : 'image/jpeg';
+    const imageFile = new File([buffer], `panel.${photo.format ?? 'jpg'}`, { type: mimeType });
 
     // 5. Generate comic illustration via OpenAI
     const result = await openai.images.edit({
       model: 'gpt-image-1',
       image: imageFile,
       prompt: buildComicPrompt(panel),
+      response_format: 'b64_json',
     });
 
     const b64json = result.data[0].b64_json!;
