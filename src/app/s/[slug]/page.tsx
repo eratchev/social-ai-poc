@@ -4,19 +4,10 @@ import { prisma } from '@/lib/prisma';
 import ShareLinkButton from '@/components/ShareLinkButton';
 import Link from 'next/link';
 import StoryMetaCard from '@/components/StoryMetaCard';
-import ComicPanel from '@/components/ComicPanel';
+import StoryViewer from '@/components/StoryViewer';
+import type { Panel } from '@/lib/ai/structured';
 
 export const runtime = 'nodejs';
-
-type Bubble = { text: string; speaker?: string; aside?: boolean };
-type Panel = {
-  index: number;
-  photoId?: string | null;
-  narration?: string;
-  bubbles?: Bubble[];
-  sfx?: string[];
-  alt?: string;
-};
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -54,7 +45,8 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
       })
     : [];
 
-  const photoUrlById = new Map<string, string>(
+  // Plain object for serializable client prop
+  const photoUrlById: Record<string, string> = Object.fromEntries(
     photos.map((p) => [p.id, p.storageUrl])
   );
 
@@ -89,22 +81,12 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         </div>
       </header>
 
-      {/* Comic grid */}
-      <section className="border-2 border-black dark:border-zinc-700">
-        <ul className="grid grid-cols-1 md:grid-cols-2 gap-0.5 bg-black dark:bg-zinc-700">
-          {panels.map((p) => (
-            <ComicPanel
-              key={p.index}
-              index={p.index}
-              narration={p.narration}
-              bubbles={p.bubbles}
-              sfx={p.sfx}
-              photoUrl={p.photoId ? (photoUrlById.get(p.photoId) ?? null) : null}
-              alt={p.alt}
-            />
-          ))}
-        </ul>
-      </section>
+      {/* Comic grid + Comicify button */}
+      <StoryViewer
+        storyId={story.id}
+        initialPanels={panels}
+        photoUrlById={photoUrlById}
+      />
 
       {/* Narrative disclosure — collapsed by default */}
       {narrativeParagraphs.length > 0 && (

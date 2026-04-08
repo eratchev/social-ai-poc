@@ -7,19 +7,19 @@ import { buildComicPrompt } from '@/lib/ai/comic-image';
 
 export const runtime = 'nodejs';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string; index: string }> }
 ) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
     const { id: storyId, index: indexStr } = await params;
     const panelIndex = parseInt(indexStr, 10);
 
@@ -80,7 +80,10 @@ export async function POST(
       response_format: 'b64_json',
     });
 
-    const b64json = result.data[0].b64_json!;
+    const b64json = result.data?.[0]?.b64_json;
+    if (!b64json) {
+      return NextResponse.json({ error: 'No image data returned from OpenAI' }, { status: 500 });
+    }
 
     // 6. Upload to Cloudinary as a data URI
     const uploadResult = await cloudinary.uploader.upload(
