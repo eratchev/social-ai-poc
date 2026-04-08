@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { prisma } from '@/lib/prisma';
 
-const { mockImagesEdit } = vi.hoisted(() => ({ mockImagesEdit: vi.fn() }));
+const { mockChatCreate } = vi.hoisted(() => ({ mockChatCreate: vi.fn() }));
+const { mockImagesGenerate } = vi.hoisted(() => ({ mockImagesGenerate: vi.fn() }));
 const { mockUpload } = vi.hoisted(() => ({ mockUpload: vi.fn() }));
-const { mockSharpToBuffer } = vi.hoisted(() => ({ mockSharpToBuffer: vi.fn() }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -13,23 +13,15 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockReturnValue({ images: { edit: mockImagesEdit } }),
+  default: vi.fn().mockReturnValue({
+    chat: { completions: { create: mockChatCreate } },
+    images: { generate: mockImagesGenerate },
+  }),
 }));
 
 vi.mock('cloudinary', () => ({
   v2: { config: vi.fn(), uploader: { upload: mockUpload } },
 }));
-
-vi.mock('sharp', () => {
-  const instance = {
-    resize: vi.fn().mockReturnThis(),
-    ensureAlpha: vi.fn().mockReturnThis(),
-    png: vi.fn().mockReturnThis(),
-    toBuffer: mockSharpToBuffer,
-  };
-  // sharp(buffer) and sharp({ create: ... }) both return the same mock instance
-  return { default: vi.fn().mockReturnValue(instance) };
-});
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
@@ -54,8 +46,10 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
       ok: true,
       arrayBuffer: async () => new ArrayBuffer(8),
     } as any);
-    mockSharpToBuffer.mockResolvedValue(Buffer.from('fake-rgba-png'));
-    mockImagesEdit.mockResolvedValue({ data: [{ b64_json: 'abc123' }] });
+    mockChatCreate.mockResolvedValue({
+      choices: [{ message: { content: 'A hero in a cape leaping between buildings.' } }],
+    });
+    mockImagesGenerate.mockResolvedValue({ data: [{ b64_json: 'abc123' }] });
     mockUpload.mockResolvedValue({ secure_url: 'https://res.cloudinary.com/test/comic.png' });
   });
 
@@ -121,7 +115,7 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     expect(data.error).toBe('not_found');
   });
 
-  it('happy path: calls OpenAI, uploads to Cloudinary, patches DB, returns URL', async () => {
+  it('happy path: calls vision, generates image, uploads to Cloudinary, patches DB, returns URL', async () => {
     vi.mocked(prisma.story.findUnique).mockResolvedValue(readyStory as any);
     vi.mocked(prisma.photo.findUnique).mockResolvedValue({
       storageUrl: 'https://res.cloudinary.com/test/original.jpg',
@@ -134,9 +128,14 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     const data = await res.json();
     expect(data.generatedImageUrl).toBe('https://res.cloudinary.com/test/comic.png');
 
-    // OpenAI called with correct model
-    expect(mockImagesEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'dall-e-2' })
+    // Vision called to describe the photo
+    expect(mockChatCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-4o-mini' })
+    );
+
+    // DALL-E 3 generate called with correct model
+    expect(mockImagesGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'dall-e-3' })
     );
 
     // Cloudinary called with base64 data URI
@@ -158,12 +157,12 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
     );
   });
 
-  it('returns 500 when OpenAI throws (DB not updated)', async () => {
+  it('returns 500 when OpenAI vision throws (DB not updated)', async () => {
     vi.mocked(prisma.story.findUnique).mockResolvedValue(readyStory as any);
     vi.mocked(prisma.photo.findUnique).mockResolvedValue({
       storageUrl: 'https://res.cloudinary.com/test/original.jpg',
     } as any);
-    mockImagesEdit.mockRejectedValue(new Error('OpenAI error'));
+    mockChatCreate.mockRejectedValue(new Error('OpenAI error'));
 
     const { POST } = await import('./route');
     const res = await POST(new Request('http://localhost'), makeParams('s1', '0'));

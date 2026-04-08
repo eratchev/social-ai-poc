@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { v2 as cloudinary } from 'cloudinary';
-import sharp from 'sharp';
 import { prisma } from '@/lib/prisma';
 import type { Panel } from '@/lib/ai/structured';
 import { buildComicPrompt } from '@/lib/ai/comic-image';
@@ -54,7 +53,7 @@ export async function POST(
       return NextResponse.json({ error: 'no_photo' }, { status: 400 });
     }
 
-    // 3. Look up photo storageUrl and format
+    // 3. Look up photo storageUrl
     const photo = await prisma.photo.findUnique({
       where: { id: panel.photoId },
       select: { storageUrl: true },
@@ -64,34 +63,45 @@ export async function POST(
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    // 4. Fetch photo bytes as PNG (dall-e-2 images.edit only accepts image/png)
-    // Cloudinary auto-converts on extension change — swap any stored extension for .png
-    const pngUrl = photo.storageUrl.replace(/\.\w+$/, '.png');
-    const photoRes = await fetch(pngUrl);
+    // 4. Fetch photo bytes and base64-encode for vision
+    const photoRes = await fetch(photo.storageUrl);
     if (!photoRes.ok) {
       throw new Error(`Failed to fetch photo: ${photoRes.status}`);
     }
-    const buffer = Buffer.from(await photoRes.arrayBuffer());
-    // dall-e-2 images.edit requires a square RGBA PNG under 4 MB
-    const rgbaBuffer = await sharp(buffer)
-      .resize(1024, 1024, { fit: 'cover' })
-      .ensureAlpha()
-      .png({ compressionLevel: 9 })
-      .toBuffer();
-    const imageFile = new File([new Uint8Array(rgbaBuffer)], 'panel.png', { type: 'image/png' });
+    const photoBuffer = Buffer.from(await photoRes.arrayBuffer());
+    const photoB64 = photoBuffer.toString('base64');
+    // Detect MIME type from URL extension, default to jpeg
+    const ext = photo.storageUrl.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
 
-    // Fully-transparent mask = "edit the entire image" (dall-e-2 uses transparency as the edit region)
-    const maskBuffer = await sharp({
-      create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-    }).png().toBuffer();
-    const maskFile = new File([new Uint8Array(maskBuffer)], 'mask.png', { type: 'image/png' });
+    // 5. Describe the photo with GPT-4o-mini vision
+    const visionResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${photoB64}`, detail: 'low' },
+            },
+            {
+              type: 'text',
+              text: 'Describe this photo for a comic book artist: who is in it, what they look like, what they are doing, the setting, and the mood. Be concise and visual (2-3 sentences).',
+            },
+          ],
+        },
+      ],
+    });
 
-    // 5. Generate comic illustration via OpenAI
-    const result = await openai.images.edit({
-      model: 'dall-e-2',
-      image: imageFile,
-      mask: maskFile,
-      prompt: buildComicPrompt(panel),
+    const photoDescription = visionResponse.choices[0]?.message?.content ?? '';
+
+    // 6. Generate comic illustration with DALL-E 3
+    const result = await openai.images.generate({
+      model: 'dall-e-3',
+      prompt: buildComicPrompt(panel, photoDescription),
+      size: '1024x1024',
       response_format: 'b64_json',
     });
 
@@ -100,14 +110,14 @@ export async function POST(
       return NextResponse.json({ error: 'No image data returned from OpenAI' }, { status: 500 });
     }
 
-    // 6. Upload to Cloudinary as a data URI
+    // 7. Upload to Cloudinary as a data URI
     const uploadResult = await cloudinary.uploader.upload(
       `data:image/png;base64,${b64json}`,
       { folder: process.env.CLOUDINARY_FOLDER ?? 'social-ai-poc' }
     );
     const generatedImageUrl = uploadResult.secure_url;
 
-    // 7. Re-read panelMap to minimize write-write race window, then patch
+    // 8. Re-read panelMap to minimize write-write race window, then patch
     const freshStory = await prisma.story.findUnique({
       where: { id: storyId },
       select: { panelMap: true },

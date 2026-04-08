@@ -38,4 +38,15 @@ describe('buildComicPrompt', () => {
     expect(prompt).not.toMatch(/\btext\b/i);
     expect(prompt).not.toMatch(/caption/i);
   });
+
+  it('includes the photo description when provided', () => {
+    const panel: Panel = { index: 0 };
+    const prompt = buildComicPrompt(panel, 'A woman in a red jacket laughing outdoors.');
+    expect(prompt).toContain('A woman in a red jacket laughing outdoors.');
+  });
+
+  it('omits Depict clause when no photo description is provided', () => {
+    const prompt = buildComicPrompt(base);
+    expect(prompt).not.toMatch(/Depict:/);
+  });
 });
