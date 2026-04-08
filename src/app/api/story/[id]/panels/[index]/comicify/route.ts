@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { v2 as cloudinary } from 'cloudinary';
+import sharp from 'sharp';
 import { prisma } from '@/lib/prisma';
 import type { Panel } from '@/lib/ai/structured';
 import { buildComicPrompt } from '@/lib/ai/comic-image';
@@ -71,7 +72,9 @@ export async function POST(
       throw new Error(`Failed to fetch photo: ${photoRes.status}`);
     }
     const buffer = Buffer.from(await photoRes.arrayBuffer());
-    const imageFile = new File([buffer], 'panel.png', { type: 'image/png' });
+    // dall-e-2 images.edit requires RGBA PNG — ensure alpha channel is present
+    const rgbaBuffer = await sharp(buffer).ensureAlpha().png().toBuffer();
+    const imageFile = new File([rgbaBuffer], 'panel.png', { type: 'image/png' });
 
     // 5. Generate comic illustration via OpenAI
     const result = await openai.images.edit({

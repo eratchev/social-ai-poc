@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 const { mockImagesEdit } = vi.hoisted(() => ({ mockImagesEdit: vi.fn() }));
 const { mockUpload } = vi.hoisted(() => ({ mockUpload: vi.fn() }));
+const { mockSharpToBuffer } = vi.hoisted(() => ({ mockSharpToBuffer: vi.fn() }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -17,6 +18,14 @@ vi.mock('openai', () => ({
 
 vi.mock('cloudinary', () => ({
   v2: { config: vi.fn(), uploader: { upload: mockUpload } },
+}));
+
+vi.mock('sharp', () => ({
+  default: vi.fn().mockReturnValue({
+    ensureAlpha: vi.fn().mockReturnThis(),
+    png: vi.fn().mockReturnThis(),
+    toBuffer: mockSharpToBuffer,
+  }),
 }));
 
 const mockFetch = vi.fn();
@@ -42,6 +51,7 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
       ok: true,
       arrayBuffer: async () => new ArrayBuffer(8),
     } as any);
+    mockSharpToBuffer.mockResolvedValue(Buffer.from('fake-rgba-png'));
     mockImagesEdit.mockResolvedValue({ data: [{ b64_json: 'abc123' }] });
     mockUpload.mockResolvedValue({ secure_url: 'https://res.cloudinary.com/test/comic.png' });
   });
