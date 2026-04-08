@@ -11,6 +11,7 @@ export type ComicPanelProps = {
   bubbles?: Bubble[];
   sfx?: string[];
   photoUrl?: string | null;
+  generatedImageUrl?: string | null;
   alt?: string;
 };
 
@@ -36,6 +37,7 @@ export default function ComicPanel({
   bubbles,
   sfx,
   photoUrl,
+  generatedImageUrl,
   alt,
 }: ComicPanelProps) {
   return (
@@ -44,9 +46,9 @@ export default function ComicPanel({
       style={{ aspectRatio: '4/3' }}
     >
       {/* Photo or large-number fallback */}
-      {photoUrl ? (
+      {(generatedImageUrl ?? photoUrl) ? (
         <Image
-          src={photoUrl}
+          src={(generatedImageUrl ?? photoUrl)!}
           alt={alt ?? `Panel ${index + 1}`}
           fill
           sizes="(min-width: 768px) 50vw, 100vw"

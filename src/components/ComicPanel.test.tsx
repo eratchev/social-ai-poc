@@ -77,4 +77,15 @@ describe('ComicPanel', () => {
     wrap(<ComicPanel index={1} photoUrl="https://example.com/img.jpg" />);
     expect(screen.getByRole('img')).toHaveAttribute('alt', 'Panel 2');
   });
+
+  it('renders generatedImageUrl instead of photoUrl when both are provided', () => {
+    wrap(
+      <ComicPanel
+        index={0}
+        photoUrl="https://example.com/original.jpg"
+        generatedImageUrl="https://example.com/comic.png"
+      />
+    );
+    expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/comic.png');
+  });
 });
