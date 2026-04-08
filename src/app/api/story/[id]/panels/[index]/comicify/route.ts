@@ -80,10 +80,17 @@ export async function POST(
       .toBuffer();
     const imageFile = new File([new Uint8Array(rgbaBuffer)], 'panel.png', { type: 'image/png' });
 
+    // Fully-transparent mask = "edit the entire image" (dall-e-2 uses transparency as the edit region)
+    const maskBuffer = await sharp({
+      create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    }).png().toBuffer();
+    const maskFile = new File([new Uint8Array(maskBuffer)], 'mask.png', { type: 'image/png' });
+
     // 5. Generate comic illustration via OpenAI
     const result = await openai.images.edit({
       model: 'dall-e-2',
       image: imageFile,
+      mask: maskFile,
       prompt: buildComicPrompt(panel),
       response_format: 'b64_json',
     });

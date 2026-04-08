@@ -20,14 +20,16 @@ vi.mock('cloudinary', () => ({
   v2: { config: vi.fn(), uploader: { upload: mockUpload } },
 }));
 
-vi.mock('sharp', () => ({
-  default: vi.fn().mockReturnValue({
+vi.mock('sharp', () => {
+  const instance = {
     resize: vi.fn().mockReturnThis(),
     ensureAlpha: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
     toBuffer: mockSharpToBuffer,
-  }),
-}));
+  };
+  // sharp(buffer) and sharp({ create: ... }) both return the same mock instance
+  return { default: vi.fn().mockReturnValue(instance) };
+});
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
