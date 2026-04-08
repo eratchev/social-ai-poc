@@ -77,7 +77,8 @@ export default function ComicPanel({
       <div className="absolute inset-0 flex flex-col justify-end z-10">
         {bubbles?.length ? (
           <div className="flex flex-wrap justify-center gap-1.5 px-2 pb-1">
-            {bubbles.slice(0, 3).map((b, i) => (
+            {/* Show up to 2 bubble chips — matches COMIC_LIMITS.bubblesPerPanel in structured.ts */}
+            {bubbles.slice(0, 2).map((b, i) => (
               <BubbleChip key={i} b={b} />
             ))}
           </div>

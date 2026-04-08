@@ -45,18 +45,16 @@ describe('ComicPanel', () => {
     expect(screen.queryByText(/looked at the sky/)).not.toBeInTheDocument();
   });
 
-  it('renders up to 3 bubble chips and truncates extras', () => {
+  it('renders up to 2 bubble chips and truncates extras', () => {
     const bubbles = [
       { text: 'First' },
       { text: 'Second' },
-      { text: 'Third' },
-      { text: 'Fourth — should be hidden' },
+      { text: 'Third — should be hidden' },
     ];
     wrap(<ComicPanel index={0} bubbles={bubbles} />);
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
-    expect(screen.getByText('Third')).toBeInTheDocument();
-    expect(screen.queryByText('Fourth — should be hidden')).not.toBeInTheDocument();
+    expect(screen.queryByText('Third — should be hidden')).not.toBeInTheDocument();
   });
 
   it('renders bubble speaker prefix', () => {
