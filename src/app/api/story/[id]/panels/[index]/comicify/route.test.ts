@@ -124,7 +124,7 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
 
     // OpenAI called with correct model
     expect(mockImagesEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gpt-image-1' })
+      expect.objectContaining({ model: 'dall-e-2' })
     );
 
     // Cloudinary called with base64 data URI

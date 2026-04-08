@@ -74,7 +74,7 @@ export async function POST(
 
     // 5. Generate comic illustration via OpenAI
     const result = await openai.images.edit({
-      model: 'gpt-image-1',
+      model: 'dall-e-2',
       image: imageFile,
       prompt: buildComicPrompt(panel),
       response_format: 'b64_json',
