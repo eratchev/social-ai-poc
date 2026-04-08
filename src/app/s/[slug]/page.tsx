@@ -1,5 +1,6 @@
 // app/s/[slug]/page.tsx
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import ShareLinkButton from '@/components/ShareLinkButton';
 import Link from 'next/link';
@@ -24,6 +25,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function SharedStoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+
+  const cookieStore = await cookies();
+  const canComicify = cookieStore.get('site_access')?.value === 'granted';
 
   const story = await prisma.story.findFirst({
     where: { shareSlug: slug, status: 'READY' },
@@ -86,6 +90,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         storyId={story.id}
         initialPanels={panels}
         photoUrlById={photoUrlById}
+        canComicify={canComicify}
       />
 
       {/* Narrative disclosure — collapsed by default */}

@@ -92,8 +92,13 @@ export async function POST(
     );
     const generatedImageUrl = uploadResult.secure_url;
 
-    // 7. Patch panelMap in DB
-    const updatedPanelMap = panels.map((p) =>
+    // 7. Re-read panelMap to minimize write-write race window, then patch
+    const freshStory = await prisma.story.findUnique({
+      where: { id: storyId },
+      select: { panelMap: true },
+    });
+    const latestPanels = (Array.isArray(freshStory?.panelMap) ? freshStory!.panelMap : panels) as Panel[];
+    const updatedPanelMap = latestPanels.map((p) =>
       p.index === panelIndex ? { ...p, generatedImageUrl } : p
     );
     await prisma.story.update({

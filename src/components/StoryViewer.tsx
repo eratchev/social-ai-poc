@@ -9,9 +9,10 @@ type StoryViewerProps = {
   storyId: string;
   initialPanels: Panel[];
   photoUrlById: Record<string, string>;
+  canComicify?: boolean;
 };
 
-export default function StoryViewer({ storyId, initialPanels, photoUrlById }: StoryViewerProps) {
+export default function StoryViewer({ storyId, initialPanels, photoUrlById, canComicify }: StoryViewerProps) {
   const [panels, setPanels] = useState<Panel[]>(initialPanels);
 
   function handlePanelDone(index: number, url: string) {
@@ -37,13 +38,15 @@ export default function StoryViewer({ storyId, initialPanels, photoUrlById }: St
         </ul>
       </section>
 
-      <div className="flex justify-center mt-4">
-        <ComicifyButton
-          storyId={storyId}
-          panels={panels}
-          onPanelDone={handlePanelDone}
-        />
-      </div>
+      {canComicify && (
+        <div className="flex justify-center mt-4">
+          <ComicifyButton
+            storyId={storyId}
+            panels={panels}
+            onPanelDone={handlePanelDone}
+          />
+        </div>
+      )}
     </>
   );
 }
