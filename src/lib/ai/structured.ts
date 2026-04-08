@@ -62,6 +62,7 @@ const PanelBase = z.object({
   narration: z.string().min(1).max(COMIC_LIMITS.narrationMax).optional(),
   sfx: z.array(z.string().min(1)).optional(),
   alt: z.string().min(1).max(160).optional(),
+  generatedImageUrl: z.string().url().optional(),
 });
 
 // Input schema: bubbles may be strings or objects
