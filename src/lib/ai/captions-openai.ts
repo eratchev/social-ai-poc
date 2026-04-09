@@ -40,13 +40,14 @@ export async function captionPhotosOpenAI(photos: PhotoIn[]): Promise<CaptionOut
     userParts.push({ type: "image_url", image_url: { url: p.url } });
   }
 
+  const supportsTemp = !model.startsWith("gpt-5") && !/^o\d/.test(model);
   const resp = await client.chat.completions.create({
     model,
     messages: [
       { role: "system", content: system },
       { role: "user", content: userParts },
     ],
-    temperature: 0.2,
+    ...(supportsTemp && { temperature: 0.2 }),
     max_completion_tokens: Math.min(4000, Math.max(500, photos.length * 150)),
   });
 

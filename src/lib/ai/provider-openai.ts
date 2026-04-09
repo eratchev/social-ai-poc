@@ -19,6 +19,11 @@ import type {
 } from "openai/resources/chat/completions";
 
 /* ---------------------------------- utils ---------------------------------- */
+/** GPT-5 and o-series models only support the default temperature (1). */
+function supportsTemperature(model: string): boolean {
+  return !model.startsWith("gpt-5") && !/^o\d/.test(model);
+}
+
 function makeUserContentWithImages(
   text: string,
   imageUrls: string[]
@@ -124,10 +129,11 @@ export class OpenAIProvider implements StoryProvider {
           },
         ];
 
+    const resolvedModel = this.model(quality);
     const resp = await this.client.chat.completions.create({
-      model: this.model(quality),
+      model: resolvedModel,
       messages,
-      temperature: this.cfg.TEMPERATURE,
+      ...(supportsTemperature(resolvedModel) && { temperature: this.cfg.TEMPERATURE }),
       max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
@@ -195,10 +201,11 @@ export class OpenAIProvider implements StoryProvider {
       { role: "user", content: [{ type: "text", text }] },
     ];
 
+    const resolvedModel = this.model(quality);
     const resp = await this.client.chat.completions.create({
-      model: this.model(quality),
+      model: resolvedModel,
       messages,
-      temperature: this.cfg.TEMPERATURE,
+      ...(supportsTemperature(resolvedModel) && { temperature: this.cfg.TEMPERATURE }),
       max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
@@ -253,10 +260,11 @@ export class OpenAIProvider implements StoryProvider {
       { role: "user", content: user },
     ];
 
+    const resolvedModel = this.model(quality);
     const resp = await this.client.chat.completions.create({
-      model: this.model(quality),
+      model: resolvedModel,
       messages,
-      temperature: this.cfg.TEMPERATURE,
+      ...(supportsTemperature(resolvedModel) && { temperature: this.cfg.TEMPERATURE }),
       max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
