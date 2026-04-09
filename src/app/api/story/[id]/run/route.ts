@@ -17,7 +17,7 @@ function getIdFromUrl(url: string): string | undefined {
   return match?.[1];
 }
 
-function withTimeout<T>(p: Promise<T>, ms = 240_000): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     p.finally(() => clearTimeout(timer)),

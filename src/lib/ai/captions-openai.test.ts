@@ -81,7 +81,7 @@ describe('captions-openai', () => {
     });
   });
 
-  it('should use default model (gpt-5-mini) when OPENAI_MODEL not set', async () => {
+  it('should use default model (gpt-4.1-mini) when OPENAI_MODEL not set', async () => {
     const photos = [{ id: 'photo1', url: 'http://example.com/1.jpg' }];
     const mockResponse = {
       choices: [
@@ -101,7 +101,7 @@ describe('captions-openai', () => {
 
     expect(mockClient.chat.completions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gpt-5-mini',
+        model: 'gpt-4.1-mini',
       })
     );
   });
