@@ -5,6 +5,7 @@ import StoryControls from '@/components/StoryControls';
 import HomeLink from '@/components/HomeLink';
 import ShareStoryQuick from '@/components/ShareStoryQuick';
 import GalleryLive from '@/components/GalleryLive';
+import RoomNameEditor from '@/components/RoomNameEditor';
 import Link from 'next/link';
 
 export const runtime = 'nodejs';
@@ -70,9 +71,7 @@ export default async function RoomPage({ params }: { params: Promise<PageParams>
       {/* Header */}
       <header className="flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Room <span className="font-mono">{room.code}</span>
-          </h1>
+          <RoomNameEditor roomCode={room.code} initialName={room.name} />
           <p className="muted">{room.photos.length} photo(s)</p>
           <div className="mt-2 flex gap-2">
             <HomeLink />
