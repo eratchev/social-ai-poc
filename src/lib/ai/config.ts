@@ -47,7 +47,7 @@ export type ProviderConfig = {
 export type Quality = "fast" | "balanced" | "premium";
 
 const OPENAI_DEFAULTS: ProviderConfig = {
-  MODEL: "gpt-4o-mini", // legacy default; kept for compatibility
+  MODEL: "gpt-4.1-mini", // legacy default; kept for compatibility
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
@@ -89,7 +89,7 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
 /** Config for the comicify pipeline (vision description + image generation). */
 export function getComicifyConfig() {
   return {
-    visionModel: process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini",
+    visionModel: process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini",
     imageModel: process.env.OPENAI_IMAGE_MODEL ?? "dall-e-3",
   };
 }
@@ -111,9 +111,9 @@ export function getModelForQuality(kind: ProviderKind, q?: Quality): string {
       premium: process.env.OPENAI_MODEL_PREMIUM,
     };
     const defaults: Record<Quality, string> = {
-      fast: "gpt-4o-mini",
-      balanced: "gpt-4o-mini",
-      premium: "gpt-4o",
+      fast: "gpt-4.1-mini",
+      balanced: "gpt-4.1-mini",
+      premium: "gpt-4.1",
     };
     return envMap[quality] || defaults[quality];
   }

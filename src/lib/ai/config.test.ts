@@ -27,7 +27,7 @@ describe('config', () => {
   describe('getCfg', () => {
     it('should return OpenAI defaults when no env vars set', () => {
       const cfg = getCfg('openai');
-      expect(cfg.MODEL).toBe('gpt-4o-mini');
+      expect(cfg.MODEL).toBe('gpt-4.1-mini');
       expect(cfg.TEMPERATURE).toBe(0.8);
       expect(cfg.MAX_TOKENS).toBe(1200);
       expect(cfg.VISION_BEATS).toBe(true);
@@ -108,17 +108,17 @@ describe('config', () => {
   describe('getModelForQuality', () => {
     it('should return OpenAI model for fast quality', () => {
       const model = getModelForQuality('openai', 'fast');
-      expect(model).toBe('gpt-4o-mini');
+      expect(model).toBe('gpt-4.1-mini');
     });
 
     it('should return OpenAI model for balanced quality', () => {
       const model = getModelForQuality('openai', 'balanced');
-      expect(model).toBe('gpt-4o-mini');
+      expect(model).toBe('gpt-4.1-mini');
     });
 
     it('should return OpenAI model for premium quality', () => {
       const model = getModelForQuality('openai', 'premium');
-      expect(model).toBe('gpt-4o');
+      expect(model).toBe('gpt-4.1');
     });
 
     it('should use env var overrides for OpenAI', () => {
@@ -158,7 +158,7 @@ describe('config', () => {
 
     it('should default to balanced when quality not provided', () => {
       const model = getModelForQuality('openai');
-      expect(model).toBe('gpt-4o-mini');
+      expect(model).toBe('gpt-4.1-mini');
     });
 
     it('should return mock model', () => {
@@ -170,7 +170,7 @@ describe('config', () => {
   describe('getComicifyConfig', () => {
     it('returns defaults when no env vars set', () => {
       const cfg = getComicifyConfig();
-      expect(cfg.visionModel).toBe('gpt-4o-mini');
+      expect(cfg.visionModel).toBe('gpt-4.1-mini');
       expect(cfg.imageModel).toBe('dall-e-3');
     });
 
