@@ -171,7 +171,7 @@ describe('config', () => {
     it('returns defaults when no env vars set', () => {
       const cfg = getComicifyConfig();
       expect(cfg.visionModel).toBe('gpt-4.1-mini');
-      expect(cfg.imageModel).toBe('gpt-image-1');
+      expect(cfg.imageModel).toBe('gpt-image-1.5');
     });
 
     it('reads OPENAI_VISION_MODEL and OPENAI_IMAGE_MODEL overrides', () => {

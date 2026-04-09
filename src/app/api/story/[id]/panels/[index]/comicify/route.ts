@@ -101,12 +101,12 @@ export async function POST(
 
     // 6. Generate comic illustration with image model
     // dall-e-3 requires response_format:'b64_json' to return base64;
-    // gpt-image-1 returns b64_json by default and doesn't accept that param.
+    // gpt-image-1 / gpt-image-1.5 return b64_json by default and don't accept that param.
     const result = await openai.images.generate({
       model: imageModel,
       prompt: buildComicPrompt(panel, photoDescription),
       size: '1024x1024',
-      ...(imageModel !== 'gpt-image-1' && { response_format: 'b64_json' }),
+      ...(!imageModel.startsWith('gpt-image-') && { response_format: 'b64_json' }),
     });
 
     const b64json = result.data?.[0]?.b64_json;
