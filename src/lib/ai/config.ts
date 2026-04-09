@@ -49,7 +49,7 @@ export type Quality = "fast" | "balanced" | "premium";
 const OPENAI_DEFAULTS: ProviderConfig = {
   MODEL: "gpt-5-mini", // legacy default; kept for compatibility
   TEMPERATURE: 0.8,
-  MAX_TOKENS: 1200,
+  MAX_TOKENS: 16000, // GPT-5 is a reasoning model — reasoning tokens consume the budget before output
   VISION_BEATS: true,
 };
 

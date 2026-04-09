@@ -48,7 +48,7 @@ export async function captionPhotosOpenAI(photos: PhotoIn[]): Promise<CaptionOut
       { role: "user", content: userParts },
     ],
     ...(supportsTemp && { temperature: 0.2 }),
-    max_completion_tokens: Math.min(4000, Math.max(500, photos.length * 150)),
+    max_completion_tokens: Math.min(16000, Math.max(2000, photos.length * 500)),
   });
 
   const raw = (resp.choices?.[0]?.message?.content ?? "{}").trim();

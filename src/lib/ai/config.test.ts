@@ -29,7 +29,7 @@ describe('config', () => {
       const cfg = getCfg('openai');
       expect(cfg.MODEL).toBe('gpt-5-mini');
       expect(cfg.TEMPERATURE).toBe(0.8);
-      expect(cfg.MAX_TOKENS).toBe(1200);
+      expect(cfg.MAX_TOKENS).toBe(16000);
       expect(cfg.VISION_BEATS).toBe(true);
     });
 
@@ -101,7 +101,7 @@ describe('config', () => {
 
       const cfg = getCfg('openai');
       expect(cfg.TEMPERATURE).toBe(0.8); // default
-      expect(cfg.MAX_TOKENS).toBe(1200); // default
+      expect(cfg.MAX_TOKENS).toBe(16000); // default
     });
   });
 
