@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getCfg, getModelForQuality } from './config';
+import { getCfg, getModelForQuality, getComicifyConfig } from './config';
 import type { ProviderKind } from './providers';
 
 describe('config', () => {
@@ -10,7 +10,8 @@ describe('config', () => {
     delete process.env.OPENAI_TEMPERATURE;
     delete process.env.OPENAI_MAX_TOKENS;
     delete process.env.OPENAI_VISION_BEATS;
-    delete process.env.OPENAI_VISION_PANELS;
+    delete process.env.OPENAI_VISION_MODEL;
+    delete process.env.OPENAI_IMAGE_MODEL;
     delete process.env.OPENAI_MODEL_FAST;
     delete process.env.OPENAI_MODEL_BALANCED;
     delete process.env.OPENAI_MODEL_PREMIUM;
@@ -18,7 +19,6 @@ describe('config', () => {
     delete process.env.ANTHROPIC_TEMPERATURE;
     delete process.env.ANTHROPIC_MAX_TOKENS;
     delete process.env.ANTHROPIC_VISION_BEATS;
-    delete process.env.ANTHROPIC_VISION_PANELS;
     delete process.env.ANTHROPIC_MODEL_FAST;
     delete process.env.ANTHROPIC_MODEL_BALANCED;
     delete process.env.ANTHROPIC_MODEL_PREMIUM;
@@ -31,7 +31,6 @@ describe('config', () => {
       expect(cfg.TEMPERATURE).toBe(0.8);
       expect(cfg.MAX_TOKENS).toBe(1200);
       expect(cfg.VISION_BEATS).toBe(true);
-      expect(cfg.VISION_PANELS).toBe(false);
     });
 
     it('should return Anthropic defaults when no env vars set', () => {
@@ -40,7 +39,6 @@ describe('config', () => {
       expect(cfg.TEMPERATURE).toBe(0.8);
       expect(cfg.MAX_TOKENS).toBe(1200);
       expect(cfg.VISION_BEATS).toBe(true);
-      expect(cfg.VISION_PANELS).toBe(false);
     });
 
     it('should return mock defaults', () => {
@@ -49,7 +47,6 @@ describe('config', () => {
       expect(cfg.TEMPERATURE).toBe(0.0);
       expect(cfg.MAX_TOKENS).toBe(1000);
       expect(cfg.VISION_BEATS).toBe(false);
-      expect(cfg.VISION_PANELS).toBe(false);
     });
 
     it('should read OpenAI env vars', () => {
@@ -57,14 +54,12 @@ describe('config', () => {
       process.env.OPENAI_TEMPERATURE = '0.5';
       process.env.OPENAI_MAX_TOKENS = '2000';
       process.env.OPENAI_VISION_BEATS = 'false';
-      process.env.OPENAI_VISION_PANELS = 'true';
 
       const cfg = getCfg('openai');
       expect(cfg.MODEL).toBe('gpt-4');
       expect(cfg.TEMPERATURE).toBe(0.5);
       expect(cfg.MAX_TOKENS).toBe(2000);
       expect(cfg.VISION_BEATS).toBe(false);
-      expect(cfg.VISION_PANELS).toBe(true);
     });
 
     it('should read Anthropic env vars', () => {
@@ -72,14 +67,12 @@ describe('config', () => {
       process.env.ANTHROPIC_TEMPERATURE = '0.7';
       process.env.ANTHROPIC_MAX_TOKENS = '3000';
       process.env.ANTHROPIC_VISION_BEATS = '0';
-      process.env.ANTHROPIC_VISION_PANELS = '1';
 
       const cfg = getCfg('anthropic');
       expect(cfg.MODEL).toBe('claude-3-opus');
       expect(cfg.TEMPERATURE).toBe(0.7);
       expect(cfg.MAX_TOKENS).toBe(3000);
       expect(cfg.VISION_BEATS).toBe(false);
-      expect(cfg.VISION_PANELS).toBe(true);
     });
 
     it('should handle boolean env vars with various formats', () => {
@@ -171,6 +164,23 @@ describe('config', () => {
     it('should return mock model', () => {
       const model = getModelForQuality('mock', 'fast');
       expect(model).toBe('mock:v0');
+    });
+  });
+
+  describe('getComicifyConfig', () => {
+    it('returns defaults when no env vars set', () => {
+      const cfg = getComicifyConfig();
+      expect(cfg.visionModel).toBe('gpt-4o-mini');
+      expect(cfg.imageModel).toBe('dall-e-3');
+    });
+
+    it('reads OPENAI_VISION_MODEL and OPENAI_IMAGE_MODEL overrides', () => {
+      process.env.OPENAI_VISION_MODEL = 'gpt-4o';
+      process.env.OPENAI_IMAGE_MODEL = 'dall-e-2';
+
+      const cfg = getComicifyConfig();
+      expect(cfg.visionModel).toBe('gpt-4o');
+      expect(cfg.imageModel).toBe('dall-e-2');
     });
   });
 });

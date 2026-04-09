@@ -12,6 +12,7 @@ import {
 import { getCfg, getModelForQuality } from "./config";
 import { enforcePhotoCoverage } from "./panels";
 import { parseTitleNarrative } from "./text";
+import { enforceComicCaps } from "./comic-utils";
 
 /* ---------------------------------- utils ---------------------------------- */
 function makeAnthropicUserContent(
@@ -27,27 +28,6 @@ function makeAnthropicUserContent(
   return content;
 }
 
-function clampWords(s = "", maxWords = 10) {
-  const parts = s.trim().split(/\s+/);
-  if (parts.length <= maxWords) return s.trim();
-  return parts.slice(0, maxWords).join(" ").replace(/[.,;:!?-]*$/, "…");
-}
-
-function enforceComicCaps(panels: Panel[]): Panel[] {
-  return panels.map((p) => {
-    const narration = p.narration
-      ? clampWords(p.narration, Math.min(12, COMIC_LIMITS.narrationMax))
-      : p.narration;
-    const bubbles = (p.bubbles ?? [])
-      .slice(0, COMIC_LIMITS.bubblesPerPanel)
-      .map((b) => ({
-        ...b,
-        text: clampWords(b.text, Math.min(10, COMIC_LIMITS.bubbleTextMax)),
-      }));
-    return { ...p, narration, bubbles };
-  });
-}
-
 export class AnthropicProvider implements StoryProvider {
   private client: Anthropic;
   private cfg: ReturnType<typeof getCfg>;
@@ -55,7 +35,7 @@ export class AnthropicProvider implements StoryProvider {
 
   constructor() {
     this.cfg = getCfg("anthropic");
-    this.defaultModel = this.cfg.MODEL || "claude-haiku-4-5";
+    this.defaultModel = this.cfg.MODEL;
     this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
   }
 
@@ -185,9 +165,7 @@ export class AnthropicProvider implements StoryProvider {
       `Photo ids (order): ${photos.map((p, i) => `[${i}]=${p.id}`).join(", ")}`,
     ].join("\n");
 
-    const content: Anthropic.Messages.ContentBlockParam[] = this.cfg.VISION_PANELS
-      ? makeAnthropicUserContent(text, photos.map((p) => p.url))
-      : [{ type: "text", text }];
+    const content: Anthropic.Messages.ContentBlockParam[] = [{ type: "text", text }];
 
     const resp = await this.client.messages.create({
       model: this.model(quality),

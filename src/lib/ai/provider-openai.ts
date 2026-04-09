@@ -12,6 +12,7 @@ import {
 import { getCfg, getModelForQuality } from "./config";
 import { enforcePhotoCoverage } from "./panels";
 import { parseTitleNarrative } from "./text";
+import { clampWords, enforceComicCaps } from "./comic-utils";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionContentPart,
@@ -27,27 +28,6 @@ function makeUserContentWithImages(
     content.push({ type: "image_url", image_url: { url } });
   }
   return content;
-}
-
-function clampWords(s = "", maxWords = 10) {
-  const parts = s.trim().split(/\s+/);
-  if (parts.length <= maxWords) return s.trim();
-  return parts.slice(0, maxWords).join(" ").replace(/[.,;:!?-]*$/, "…");
-}
-
-function enforceComicCaps(panels: Panel[]): Panel[] {
-  return panels.map((p) => {
-    const narration = p.narration
-      ? clampWords(p.narration, Math.min(12, COMIC_LIMITS.narrationMax))
-      : p.narration;
-    const bubbles = (p.bubbles ?? [])
-      .slice(0, COMIC_LIMITS.bubblesPerPanel)
-      .map((b) => ({
-        ...b,
-        text: clampWords(b.text, Math.min(10, COMIC_LIMITS.bubbleTextMax)),
-      }));
-    return { ...p, narration, bubbles };
-  });
 }
 
 export class OpenAIProvider implements StoryProvider {
@@ -210,21 +190,10 @@ export class OpenAIProvider implements StoryProvider {
       `Photo ids (order): ${photos.map((p, i) => `[${i}]=${p.id}`).join(", ")}`,
     ].join("\n");
 
-    const messages: ChatCompletionMessageParam[] = this.cfg.VISION_PANELS
-      ? [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content: makeUserContentWithImages(
-              text,
-              photos.map((p) => p.url)
-            ),
-          },
-        ]
-      : [
-          { role: "system", content: system },
-          { role: "user", content: [{ type: "text", text }] },
-        ];
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: system },
+      { role: "user", content: [{ type: "text", text }] },
+    ];
 
     const resp = await this.client.chat.completions.create({
       model: this.model(quality),

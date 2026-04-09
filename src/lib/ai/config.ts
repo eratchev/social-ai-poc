@@ -40,7 +40,6 @@ export type ProviderConfig = {
   TEMPERATURE: number;
   MAX_TOKENS: number;
   VISION_BEATS: boolean;
-  VISION_PANELS: boolean;
 };
 
 export type Quality = "fast" | "balanced" | "premium";
@@ -50,7 +49,6 @@ const OPENAI_DEFAULTS: ProviderConfig = {
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
-  VISION_PANELS: false,
 };
 
 const ANTHROPIC_DEFAULTS: ProviderConfig = {
@@ -58,7 +56,6 @@ const ANTHROPIC_DEFAULTS: ProviderConfig = {
   TEMPERATURE: 0.8,
   MAX_TOKENS: 1200,
   VISION_BEATS: true,
-  VISION_PANELS: false,
 };
 
 export function getCfg(kind: ProviderKind): ProviderConfig {
@@ -68,7 +65,6 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
       TEMPERATURE: num(process.env.OPENAI_TEMPERATURE, OPENAI_DEFAULTS.TEMPERATURE),
       MAX_TOKENS: num(process.env.OPENAI_MAX_TOKENS, OPENAI_DEFAULTS.MAX_TOKENS),
       VISION_BEATS: bool(process.env.OPENAI_VISION_BEATS, OPENAI_DEFAULTS.VISION_BEATS),
-      VISION_PANELS: bool(process.env.OPENAI_VISION_PANELS, OPENAI_DEFAULTS.VISION_PANELS),
     };
   }
   if (kind === "anthropic") {
@@ -77,7 +73,6 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
       TEMPERATURE: num(process.env.ANTHROPIC_TEMPERATURE, ANTHROPIC_DEFAULTS.TEMPERATURE),
       MAX_TOKENS: num(process.env.ANTHROPIC_MAX_TOKENS, ANTHROPIC_DEFAULTS.MAX_TOKENS),
       VISION_BEATS: bool(process.env.ANTHROPIC_VISION_BEATS, ANTHROPIC_DEFAULTS.VISION_BEATS),
-      VISION_PANELS: bool(process.env.ANTHROPIC_VISION_PANELS, ANTHROPIC_DEFAULTS.VISION_PANELS),
     };
   }
   // mock uses conservative defaults
@@ -86,7 +81,14 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
     TEMPERATURE: 0.0,
     MAX_TOKENS: 1_000,
     VISION_BEATS: false,
-    VISION_PANELS: false,
+  };
+}
+
+/** Config for the comicify pipeline (vision description + image generation). */
+export function getComicifyConfig() {
+  return {
+    visionModel: process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini",
+    imageModel: process.env.OPENAI_IMAGE_MODEL ?? "dall-e-3",
   };
 }
 

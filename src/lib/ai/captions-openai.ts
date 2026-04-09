@@ -2,6 +2,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { safeJson } from "./structured";
+import { getCfg } from "./config";
 
 export type PhotoIn = { id: string; url: string };
 export type CaptionOut = { id: string; caption: string; tags: string[] };
@@ -18,7 +19,7 @@ const CaptionSchema = z.object({
 
 export async function captionPhotosOpenAI(photos: PhotoIn[]): Promise<CaptionOut[]> {
   if (!photos.length) return [];
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model = getCfg("openai").MODEL;
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
   const system =

@@ -4,6 +4,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '@/lib/prisma';
 import type { Panel } from '@/lib/ai/structured';
 import { buildComicPrompt } from '@/lib/ai/comic-image';
+import { getComicifyConfig } from '@/lib/ai/config';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +14,7 @@ export async function POST(
 ) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const { visionModel, imageModel } = getComicifyConfig();
 
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -76,7 +78,7 @@ export async function POST(
 
     // 5. Describe the photo with GPT-4o-mini vision
     const visionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: visionModel,
       max_tokens: 300,
       messages: [
         {
@@ -99,7 +101,7 @@ export async function POST(
 
     // 6. Generate comic illustration with DALL-E 3
     const result = await openai.images.generate({
-      model: 'dall-e-3',
+      model: imageModel,
       prompt: buildComicPrompt(panel, photoDescription),
       size: '1024x1024',
       response_format: 'b64_json',
