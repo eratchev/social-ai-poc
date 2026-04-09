@@ -30,6 +30,7 @@ model User {
 model Room {
   id        String   @id @default(cuid())
   code      String   @unique
+  name      String?
   createdBy String
   creator   User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
