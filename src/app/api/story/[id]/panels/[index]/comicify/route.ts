@@ -99,15 +99,15 @@ export async function POST(
 
     const photoDescription = visionResponse.choices[0]?.message?.content ?? '';
 
-    // 6. Generate comic illustration with DALL-E 3
+    // 6. Generate comic illustration with image model
     const result = await openai.images.generate({
       model: imageModel,
       prompt: buildComicPrompt(panel, photoDescription),
       size: '1024x1024',
-      response_format: 'b64_json',
     });
 
-    const b64json = result.data?.[0]?.b64_json;
+    // gpt-image-1 returns `b64`; dall-e-3 with response_format:'b64_json' returns `b64_json`
+    const b64json = result.data?.[0]?.b64 ?? result.data?.[0]?.b64_json;
     if (!b64json) {
       return NextResponse.json({ error: 'No image data returned from OpenAI' }, { status: 500 });
     }
