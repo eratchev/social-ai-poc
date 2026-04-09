@@ -236,5 +236,35 @@ describe('captions-openai', () => {
     expect(result[0].id).toBe('photo1');
     expect(result[1].id).toBe('photo3');
   });
+
+  it('should omit temperature for gpt-5 models', async () => {
+    process.env.OPENAI_MODEL = 'gpt-5-mini';
+    const photos = [{ id: 'photo1', url: 'http://example.com/1.jpg' }];
+    const mockResponse = {
+      choices: [{ message: { content: JSON.stringify({ photos: [{ index: 0, caption: 'Test', tags: ['a'] }] }) } }],
+    };
+    vi.mocked(mockClient.chat.completions.create).mockResolvedValue(mockResponse as any);
+
+    await captionPhotosOpenAI(photos);
+
+    expect(mockClient.chat.completions.create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ temperature: expect.anything() })
+    );
+  });
+
+  it('should include temperature for gpt-4 models', async () => {
+    process.env.OPENAI_MODEL = 'gpt-4o';
+    const photos = [{ id: 'photo1', url: 'http://example.com/1.jpg' }];
+    const mockResponse = {
+      choices: [{ message: { content: JSON.stringify({ photos: [{ index: 0, caption: 'Test', tags: ['a'] }] }) } }],
+    };
+    vi.mocked(mockClient.chat.completions.create).mockResolvedValue(mockResponse as any);
+
+    await captionPhotosOpenAI(photos);
+
+    expect(mockClient.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ temperature: expect.any(Number) })
+    );
+  });
 });
 
