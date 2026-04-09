@@ -135,7 +135,7 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
 
     // Image model generate called with correct model
     expect(mockImagesGenerate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'dall-e-3' })
+      expect.objectContaining({ model: 'gpt-image-1' })
     );
 
     // Cloudinary called with base64 data URI

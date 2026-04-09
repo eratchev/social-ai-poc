@@ -90,7 +90,7 @@ export function getCfg(kind: ProviderKind): ProviderConfig {
 export function getComicifyConfig() {
   return {
     visionModel: process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini",
-    imageModel: process.env.OPENAI_IMAGE_MODEL ?? "dall-e-3",
+    imageModel: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
   };
 }
 
