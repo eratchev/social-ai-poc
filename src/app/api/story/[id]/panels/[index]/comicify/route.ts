@@ -106,8 +106,7 @@ export async function POST(
       size: '1024x1024',
     });
 
-    // gpt-image-1 returns `b64`; dall-e-3 with response_format:'b64_json' returns `b64_json`
-    const b64json = result.data?.[0]?.b64 ?? result.data?.[0]?.b64_json;
+    const b64json = result.data?.[0]?.b64_json;
     if (!b64json) {
       return NextResponse.json({ error: 'No image data returned from OpenAI' }, { status: 500 });
     }
