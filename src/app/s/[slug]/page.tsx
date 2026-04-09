@@ -91,6 +91,7 @@ export default async function SharedStoryPage({ params }: { params: Promise<{ sl
         initialPanels={panels}
         photoUrlById={photoUrlById}
         canComicify={canComicify}
+        canToggle
       />
 
       {/* Narrative disclosure — collapsed by default */}

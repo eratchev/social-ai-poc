@@ -10,9 +10,10 @@ type StoryViewerProps = {
   initialPanels: Panel[];
   photoUrlById: Record<string, string>;
   canComicify?: boolean;
+  canToggle?: boolean;
 };
 
-export default function StoryViewer({ storyId, initialPanels, photoUrlById, canComicify }: StoryViewerProps) {
+export default function StoryViewer({ storyId, initialPanels, photoUrlById, canComicify, canToggle = true }: StoryViewerProps) {
   const [panels, setPanels] = useState<Panel[]>(initialPanels);
   // Set of panel indices currently showing the original photo instead of comic art
   const [showOriginal, setShowOriginal] = useState<Set<number>>(new Set());
@@ -54,7 +55,7 @@ export default function StoryViewer({ storyId, initialPanels, photoUrlById, canC
                   generatedImageUrl={isShowingOriginal ? null : (p.generatedImageUrl ?? null)}
                   alt={p.alt}
                 />
-                {hasComicArt && canComicify && (
+                {hasComicArt && canToggle && (
                   <button
                     onClick={() => toggleView(p.index)}
                     className="absolute bottom-2 right-2 z-10 rounded px-2 py-1 text-xs font-semibold bg-black/60 text-white hover:bg-black/80 transition-colors"
