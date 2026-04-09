@@ -42,13 +42,13 @@ describe("AnthropicProvider — env vars read at construct/call time (Bug 4)", (
     expect(provider.modelName()).toBe("claude-3-opus-20240229");
   });
 
-  it("modelName() falls back to 'claude-haiku-4-5' when ANTHROPIC_MODEL is unset", async () => {
+  it("modelName() falls back to 'claude-haiku-4-5-20251001' when ANTHROPIC_MODEL is unset", async () => {
     delete process.env.ANTHROPIC_MODEL;
 
     const { AnthropicProvider } = await import("./provider-anthropic");
     const provider = new AnthropicProvider();
 
-    expect(provider.modelName()).toBe("claude-haiku-4-5");
+    expect(provider.modelName()).toBe("claude-haiku-4-5-20251001");
   });
 
   it("two instances created with different ANTHROPIC_MODEL values return different modelName()", async () => {
