@@ -10,14 +10,14 @@ import { captionPhotosOpenAI } from "@/lib/ai/captions-openai";
 import { getModelForQuality } from "@/lib/ai/config";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // Pro plan allows up to 300s; reasoning models need time
 
 function getIdFromUrl(url: string): string | undefined {
   const match = new URL(url).pathname.match(/\/api\/story\/([^/]+)\/run$/);
   return match?.[1];
 }
 
-function withTimeout<T>(p: Promise<T>, ms = 45_000): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms = 240_000): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
     p.finally(() => clearTimeout(timer)),
@@ -104,10 +104,11 @@ export async function POST(req: Request) {
       caption: undefined as string | undefined,
     }));
 
-    // Caption pass (best-effort, non-fatal)
+    // Caption pass (best-effort, non-fatal, hard 12s timeout)
     try {
-      const caps = await captionPhotosOpenAI(
-        photos.map((p) => ({ id: p.id, url: p.storageUrl }))
+      const caps = await withTimeout(
+        captionPhotosOpenAI(photos.map((p) => ({ id: p.id, url: p.storageUrl }))),
+        12_000
       );
       const byId = new Map(caps.map((c) => [c.id, c]));
       photoArgs = photoArgs.map((p) => {
