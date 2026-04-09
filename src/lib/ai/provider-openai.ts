@@ -128,7 +128,7 @@ export class OpenAIProvider implements StoryProvider {
       model: this.model(quality),
       messages,
       temperature: this.cfg.TEMPERATURE,
-      max_tokens: this.cfg.MAX_TOKENS,
+      max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
@@ -199,7 +199,7 @@ export class OpenAIProvider implements StoryProvider {
       model: this.model(quality),
       messages,
       temperature: this.cfg.TEMPERATURE,
-      max_tokens: this.cfg.MAX_TOKENS,
+      max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
@@ -257,7 +257,7 @@ export class OpenAIProvider implements StoryProvider {
       model: this.model(quality),
       messages,
       temperature: this.cfg.TEMPERATURE,
-      max_tokens: this.cfg.MAX_TOKENS,
+      max_completion_tokens: this.cfg.MAX_TOKENS,
     });
 
     const raw = (resp.choices?.[0]?.message?.content ?? "").trim();

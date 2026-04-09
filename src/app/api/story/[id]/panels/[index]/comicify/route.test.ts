@@ -130,12 +130,12 @@ describe('POST /api/story/[id]/panels/[index]/comicify', () => {
 
     // Vision called to describe the photo
     expect(mockChatCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gpt-4o-mini' })
+      expect.objectContaining({ model: 'gpt-5' })
     );
 
-    // DALL-E 3 generate called with correct model
+    // Image model generate called with correct model
     expect(mockImagesGenerate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'dall-e-3' })
+      expect.objectContaining({ model: 'gpt-image-1' })
     );
 
     // Cloudinary called with base64 data URI

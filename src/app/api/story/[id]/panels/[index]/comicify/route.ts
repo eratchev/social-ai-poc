@@ -79,7 +79,7 @@ export async function POST(
     // 5. Describe the photo with vision model
     const visionResponse = await openai.chat.completions.create({
       model: visionModel,
-      max_tokens: 300,
+      max_completion_tokens: 300,
       messages: [
         {
           role: 'user',

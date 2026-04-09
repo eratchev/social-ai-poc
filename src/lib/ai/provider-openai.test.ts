@@ -42,13 +42,13 @@ describe("OpenAIProvider — env vars read at construct/call time (Bug 4)", () =
     expect(provider.modelName()).toBe("gpt-4-turbo");
   });
 
-  it("modelName() falls back to 'gpt-4o-mini' when OPENAI_MODEL is unset", async () => {
+  it("modelName() falls back to 'gpt-5-mini' when OPENAI_MODEL is unset", async () => {
     delete process.env.OPENAI_MODEL;
 
     const { OpenAIProvider } = await import("./provider-openai");
     const provider = new OpenAIProvider();
 
-    expect(provider.modelName()).toBe("gpt-4o-mini");
+    expect(provider.modelName()).toBe("gpt-5-mini");
   });
 
   it("two instances created with different OPENAI_MODEL values return different modelName()", async () => {
