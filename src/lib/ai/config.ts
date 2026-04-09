@@ -20,19 +20,21 @@ function num(v: unknown, def: number) {
  *
  * OpenAI envs (all optional):
  *   OPENAI_MODEL                      (legacy single/default)
- *   OPENAI_MODEL_FAST | _BALANCED | _PREMIUM  (new preset overrides)
+ *   OPENAI_MODEL_FAST | _BALANCED | _PREMIUM  (quality preset overrides)
  *   OPENAI_TEMPERATURE
  *   OPENAI_MAX_TOKENS
  *   OPENAI_VISION_BEATS
- *   OPENAI_VISION_PANELS
  *
  * Anthropic envs (all optional):
  *   ANTHROPIC_MODEL                   (legacy single/default)
- *   ANTHROPIC_MODEL_FAST | _BALANCED | _PREMIUM (new preset overrides)
+ *   ANTHROPIC_MODEL_FAST | _BALANCED | _PREMIUM (quality preset overrides)
  *   ANTHROPIC_TEMPERATURE
  *   ANTHROPIC_MAX_TOKENS
  *   ANTHROPIC_VISION_BEATS
- *   ANTHROPIC_VISION_PANELS
+ *
+ * Comicify pipeline envs (all optional):
+ *   OPENAI_VISION_MODEL               (default: gpt-4o-mini)
+ *   OPENAI_IMAGE_MODEL                (default: dall-e-3)
  */
 
 export type ProviderConfig = {

@@ -76,7 +76,7 @@ export async function POST(
     const ext = photo.storageUrl.split('.').pop()?.toLowerCase() ?? 'jpg';
     const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
 
-    // 5. Describe the photo with GPT-4o-mini vision
+    // 5. Describe the photo with vision model
     const visionResponse = await openai.chat.completions.create({
       model: visionModel,
       max_tokens: 300,

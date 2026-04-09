@@ -26,7 +26,7 @@ describe('captions-openai', () => {
     vi.clearAllMocks();
     vi.mocked(OpenAI).mockImplementation(() => mockClient as any);
     process.env.OPENAI_API_KEY = 'test-key';
-    delete process.env.AI_DEFAULT_MODEL;
+    delete process.env.OPENAI_MODEL;
     // Reset safeJson mock
     vi.mocked(safeJson).mockImplementation((str: string) => {
       try {
@@ -81,7 +81,7 @@ describe('captions-openai', () => {
     });
   });
 
-  it('should use default model when AI_DEFAULT_MODEL not set', async () => {
+  it('should use default model (gpt-4o-mini) when OPENAI_MODEL not set', async () => {
     const photos = [{ id: 'photo1', url: 'http://example.com/1.jpg' }];
     const mockResponse = {
       choices: [
@@ -106,8 +106,8 @@ describe('captions-openai', () => {
     );
   });
 
-  it('should use custom model from env', async () => {
-    process.env.AI_DEFAULT_MODEL = 'gpt-4';
+  it('should use OPENAI_MODEL override when set', async () => {
+    process.env.OPENAI_MODEL = 'gpt-4o';
     const photos = [{ id: 'photo1', url: 'http://example.com/1.jpg' }];
     const mockResponse = {
       choices: [
@@ -123,11 +123,11 @@ describe('captions-openai', () => {
 
     vi.mocked(mockClient.chat.completions.create).mockResolvedValue(mockResponse as any);
 
-    // The model is read at module load time, so we test the default behavior
-    // For custom model testing, we'd need to test the actual module loading
     await captionPhotosOpenAI(photos);
 
-    expect(mockClient.chat.completions.create).toHaveBeenCalled();
+    expect(mockClient.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-4o' })
+    );
   });
 
   it('should handle invalid response gracefully', async () => {
