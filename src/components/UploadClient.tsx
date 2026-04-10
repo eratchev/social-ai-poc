@@ -213,7 +213,9 @@ export default function UploadClient({
       }),
     });
 
-    // instantly re-render server components (gallery count & list) without full reload
+    // Notify GalleryLive to re-fetch immediately
+    window.dispatchEvent(new Event('photos:added'));
+    // Also re-render server components (photo count in header, etc.)
     router.refresh();
 
     return { url: result.secure_url, public_id: result.public_id, meta: result };

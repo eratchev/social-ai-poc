@@ -74,4 +74,28 @@ describe('GalleryLive', () => {
     expect(screen.getByText(/no images yet/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete photo/i })).not.toBeInTheDocument();
   });
+
+  it('re-fetches and shows new photos when photos:added event fires', async () => {
+    const newPhoto: Photo = {
+      id: 'p3',
+      storageUrl: 'https://res.cloudinary.com/test/image/upload/v1/img3.jpg',
+      width: 800,
+      height: 600,
+      publicId: 'img3',
+    };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ photos: [...twoPhotos, newPhoto] }),
+    } as any);
+
+    render(<GalleryLive roomCode="ABC" initial={twoPhotos} />);
+    expect(screen.getAllByRole('img').length).toBe(2);
+
+    fireEvent(window, new Event('photos:added'));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(3);
+    });
+    expect(mockFetch).toHaveBeenCalledWith('/api/rooms/ABC/photos', { cache: 'no-store' });
+  });
 });
